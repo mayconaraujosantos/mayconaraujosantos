@@ -105,3 +105,4 @@ Minha experiência abrange a liderança técnica e a contribuição individual e
 
 Agradeço o seu interesse em meu perfil. Estou sempre aberto a novas oportunidades e desafios que me permitam aplicar e expandir minhas habilidades. 
 
+https://gitee.com/superbeyone/J2_B5_A5_C4/blob/master/licenses/2025/2025-05-11.md
