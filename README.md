@@ -346,6 +346,560 @@ CREATE INDEX idx_tax_identifier_root ON card_receivables_schedules (SUBSTRING(ta
 
 ```
 
+```sql
+CREATE TABLE card_receivables_schedules (
+    id VARCHAR(26) NOT NULL,
+    tax_identifier VARCHAR(26) NOT NULL,
+    register VARCHAR(20) NOT NULL,
+    arrangement VARCHAR(3) NOT NULL,
+    accreditor VARCHAR(20) NOT NULL,
+    source VARCHAR(20) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    schedules JSONB NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE INDEX idx_tax_identifier ON card_receivables_schedules (tax_identifier);
+CREATE INDEX idx_tax_identifier_root ON card_receivables_schedules (left(tax_identifier, 8));
+CREATE INDEX idx_date_range ON card_receivables_schedules (start_date, end_date);
+```
+```kotlin
+package com.finapp.dataaccess
+
+import com.finapp.repository.CardReceivablesSchedule
+import com.finapp.repository.CardReceivablesScheduleRepository
+import org.springframework.stereotype.Component
+import java.time.LocalDate
+
+interface CardReceivablesScheduleDataAccess {
+    fun findByTaxIdentifierAndDateOverlap(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
+    fun findByTaxIdentifierAndStartDateBetween(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
+    fun findByTaxIdentifierAndEndDateBetween(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
+    fun findByRootTaxIdentifierAndDateOverlap(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
+    fun findByRootTaxIdentifierAndStartDateBetween(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
+    fun findByRootTaxIdentifierAndEndDateBetween(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
+    fun findByCompositeKeyAndDateOverlap(
+        taxIdentifier: String,
+        register: String,
+        arrangement: String,
+        accreditor: String,
+        source: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): List<CardReceivablesSchedule>
+}
+
+@Component
+class CardReceivablesScheduleDataAccessImpl(
+    private val repository: CardReceivablesScheduleRepository
+) : CardReceivablesScheduleDataAccess {
+
+    override fun findByTaxIdentifierAndDateOverlap(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule> {
+        require(taxIdentifier.matches(Regex("\\d{14}"))) { "Tax identifier must be a 14-digit CNPJ" }
+        require(startDate <= endDate) { "Start date must not be after end date" }
+        return repository.findByTaxIdentifierAndDateOverlap(taxIdentifier, startDate, endDate)
+    }
+
+    override fun findByTaxIdentifierAndStartDateBetween(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule> {
+        require(taxIdentifier.matches(Regex("\\d{14}"))) { "Tax identifier must be a 14-digit CNPJ" }
+        require(startDate <= endDate) { "Start date must not be after end date" }
+        return repository.findByTaxIdentifierAndStartDateBetween(taxIdentifier, startDate, endDate)
+    }
+
+    override fun findByTaxIdentifierAndEndDateBetween(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule> {
+        require(taxIdentifier.matches(Regex("\\d{14}"))) { "Tax identifier must be a 14-digit CNPJ" }
+        require(startDate <= endDate) { "Start date must not be after end date" }
+        return repository.findByTaxIdentifierAndEndDateBetween(taxIdentifier, startDate, endDate)
+    }
+
+    override fun findByRootTaxIdentifierAndDateOverlap(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule> {
+        require(rootTaxIdentifier.matches(Regex("\\d{8}"))) { "Root tax identifier must be an 8-digit CNPJ root" }
+        require(startDate <= endDate) { "Start date must not be after end date" }
+        return repository.findByRootTaxIdentifierAndDateOverlap(rootTaxIdentifier, startDate, endDate)
+    }
+
+    override fun findByRootTaxIdentifierAndStartDateBetween(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule> {
+        require(rootTaxIdentifier.matches(Regex("\\d{8}"))) { "Root tax identifier must be an 8-digit CNPJ root" }
+        require(startDate <= endDate) { "Start date must not be after end date" }
+        return repository.findByRootTaxIdentifierAndStartDateBetween(rootTaxIdentifier, startDate, endDate)
+    }
+
+    override fun findByRootTaxIdentifierAndEndDateBetween(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule> {
+        require(rootTaxIdentifier.matches(Regex("\\d{8}"))) { "Root tax identifier must be an 8-digit CNPJ root" }
+        require(startDate <= endDate) { "Start date must not be after end date" }
+        return repository.findByRootTaxIdentifierAndEndDateBetween(rootTaxIdentifier, startDate, endDate)
+    }
+
+    override fun findByCompositeKeyAndDateOverlap(
+        taxIdentifier: String,
+        register: String,
+        arrangement: String,
+        accreditor: String,
+        source: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): List<CardReceivablesSchedule> {
+        require(taxIdentifier.matches(Regex("\\d{14}"))) { "Tax identifier must be a 14-digit CNPJ" }
+        require(register.length <= 20) { "Register must not exceed 20 characters" }
+        require(arrangement.length <= 3) { "Arrangement must not exceed 3 characters" }
+        require(accreditor.length <= 20) { "Accreditor must not exceed 20 characters" }
+        require(source.length <= 20) { "Source must not exceed 20 characters" }
+        require(startDate <= endDate) { "Start date must not be after end date" }
+        return repository.findByCompositeKeyAndDateOverlap(taxIdentifier, register, arrangement, accreditor, source, startDate, endDate)
+    }
+}
+```
+```kotlin
+package com.finapp.repository
+
+import com.finapp.dataaccess.CardReceivablesScheduleDataAccess
+import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.util.UUID
+
+@Service
+class CardReceivablesScheduleService(
+    private val dataAccess: CardReceivablesScheduleDataAccess,
+    private val repository: CardReceivablesScheduleRepository
+) {
+    fun saveSchedule(schedule: CardReceivablesSchedule): CardReceivablesSchedule {
+        val scheduleToSave = schedule.copy(
+            schedules = schedule.schedules.takeIf { it.isNotEmpty() } ?: "[]"
+        )
+        return repository.save(scheduleToSave)
+    }
+
+    fun getSchedulesByTaxIdentifier(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule> {
+        val schedules = dataAccess.findByTaxIdentifierAndDateOverlap(taxIdentifier, startDate, endDate)
+        if (schedules.isNotEmpty()) {
+            return schedules
+        }
+        val emptySchedule = createEmptySchedule(taxIdentifier, startDate, endDate)
+        repository.save(emptySchedule)
+        return listOf(emptySchedule)
+    }
+
+    fun getSchedulesByRootTaxIdentifier(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule> {
+        val schedules = dataAccess.findByRootTaxIdentifierAndDateOverlap(rootTaxIdentifier, startDate, endDate)
+        if (schedules.isNotEmpty()) {
+            return schedules
+        }
+        val paddedCnpj = rootTaxIdentifier.padEnd(14, '0')
+        val emptySchedule = createEmptySchedule(paddedCnpj, startDate, endDate)
+        repository.save(emptySchedule)
+        return listOf(emptySchedule)
+    }
+
+    fun getSchedulesByCompositeKey(
+        taxIdentifier: String,
+        register: String,
+        arrangement: String,
+        accreditor: String,
+        source: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): List<CardReceivablesSchedule> {
+        val schedules = dataAccess.findByCompositeKeyAndDateOverlap(taxIdentifier, register, arrangement, accreditor, source, startDate, endDate)
+        if (schedules.isNotEmpty()) {
+            return schedules
+        }
+        val emptySchedule = CardReceivablesSchedule(
+            id = UUID.randomUUID().toString().replace("-", "").substring(0, 26),
+            taxIdentifier = taxIdentifier,
+            register = register,
+            arrangement = arrangement,
+            accreditor = accreditor,
+            source = source,
+            startDate = startDate,
+            endDate = endDate,
+            schedules = "[]"
+        )
+        repository.save(emptySchedule)
+        return listOf(emptySchedule)
+    }
+
+    private fun createEmptySchedule(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): CardReceivablesSchedule {
+        return CardReceivablesSchedule(
+            id = UUID.randomUUID().toString().replace("-", "").substring(0, 26),
+            taxIdentifier = taxIdentifier,
+            register = "",
+            arrangement = "",
+            accreditor = "",
+            source = "ONLINE",
+            startDate = startDate,
+            endDate = endDate,
+            schedules = "[]"
+        )
+    }
+}
+```
+```kotlin
+package com.finapp.dataaccess
+
+import com.finapp.repository.CardReceivablesSchedule
+import com.finapp.repository.CardReceivablesScheduleRepository
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.InjectMocks
+import org.mockito.Mock
+import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.whenever
+import java.time.LocalDate
+import java.time.LocalDateTime
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.assertThrows
+
+@ExtendWith(MockitoExtension::class)
+class CardReceivablesScheduleDataAccessTest {
+
+    @Mock
+    private lateinit var repository: CardReceivablesScheduleRepository
+
+    @InjectMocks
+    private lateinit var dataAccess: CardReceivablesScheduleDataAccessImpl
+
+    private val testSchedules = listOf(
+        CardReceivablesSchedule(
+            id = "123e4567e89b12d3a456426614",
+            taxIdentifier = "12345678000195",
+            register = "CERC",
+            arrangement = "VIS",
+            accreditor = "CIELO",
+            source = "ONLINE",
+            startDate = LocalDate.of(2025, 7, 1),
+            endDate = LocalDate.of(2025, 7, 31),
+            schedules = """[{"date": "2025-07-01", "amount": 1000.50}, {"date": "2025-07-15", "amount": 2000.75}]""",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 0, 0)
+        ),
+        CardReceivablesSchedule(
+            id = "223e4567e89b12d3a456426614",
+            taxIdentifier = "12345678000296",
+            register = "NUCLEA",
+            arrangement = "MAS",
+            accreditor = "REDECARD",
+            source = "FILE",
+            startDate = LocalDate.of(2025, 6, 15),
+            endDate = LocalDate.of(2025, 7, 15),
+            schedules = """[{"date": "2025-07-02", "amount": 1500.25}]""",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 1, 0)
+        ),
+        CardReceivablesSchedule(
+            id = "323e4567e89b12d3a456426614",
+            taxIdentifier = "98765432000188",
+            register = "CERC",
+            arrangement = "VIS",
+            accreditor = "CIELO",
+            source = "ONLINE",
+            startDate = LocalDate.of(2025, 7, 1),
+            endDate = LocalDate.of(2025, 7, 31),
+            schedules = "[]",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 2, 0)
+        ),
+        CardReceivablesSchedule(
+            id = "423e4567e89b12d3a456426614",
+            taxIdentifier = "12345678000397",
+            register = "CERC",
+            arrangement = "AME",
+            accreditor = "GETNET",
+            source = "FILE",
+            startDate = LocalDate.of(2025, 7, 10),
+            endDate = LocalDate.of(2025, 8, 10),
+            schedules = """[{"date": "2025-07-03", "amount": 3000.00}]""",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 3, 0)
+        ),
+        CardReceivablesSchedule(
+            id = "523e4567e89b12d3a456426614",
+            taxIdentifier = "45678912000177",
+            register = "NUCLEA",
+            arrangement = "MAS",
+            accreditor = "STONE",
+            source = "ONLINE",
+            startDate = LocalDate.of(2025, 6, 1),
+            endDate = LocalDate.of(2025, 6, 30),
+            schedules = """[{"date": "2025-06-04", "amount": 2500.30}, {"date": "2025-06-05", "amount": 1800.60}]""",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 4, 0)
+        )
+    )
+
+    @Test
+    fun `findByTaxIdentifierAndDateOverlap should return schedules for existing CNPJ and overlapping date range`() {
+        val taxIdentifier = "12345678000195"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+        whenever(repository.findByTaxIdentifierAndDateOverlap(taxIdentifier, startDate, endDate))
+            .thenReturn(testSchedules.filter {
+                it.taxIdentifier == taxIdentifier &&
+                it.startDate <= endDate && it.endDate >= startDate
+            })
+
+        val schedules = dataAccess.findByTaxIdentifierAndDateOverlap(taxIdentifier, startDate, endDate)
+
+        assertEquals(1, schedules.size)
+        val schedule = schedules[0]
+        assertEquals("123e4567e89b12d3a456426614", schedule.id)
+        assertEquals(taxIdentifier, schedule.taxIdentifier)
+        assertEquals("CERC", schedule.register)
+        assertEquals("VIS", schedule.arrangement)
+        assertEquals("CIELO", schedule.accreditor)
+        assertEquals("ONLINE", schedule.source)
+        assertEquals("""[{"date": "2025-07-01", "amount": 1000.50}, {"date": "2025-07-15", "amount": 2000.75}]""", schedule.schedules)
+        assertEquals(LocalDate.of(2025, 7, 1), schedule.startDate)
+        assertEquals(LocalDate.of(2025, 7, 31), schedule.endDate)
+    }
+
+    @Test
+    fun `findByTaxIdentifierAndStartDateBetween should return schedules for existing CNPJ and start date in range`() {
+        val taxIdentifier = "12345678000195"
+        val startDate = LocalDate.of(2025, 6, 30)
+        val endDate = LocalDate.of(2025, 7, 2)
+        whenever(repository.findByTaxIdentifierAndStartDateBetween(taxIdentifier, startDate, endDate))
+            .thenReturn(testSchedules.filter {
+                it.taxIdentifier == taxIdentifier &&
+                it.startDate in startDate..endDate
+            })
+
+        val schedules = dataAccess.findByTaxIdentifierAndStartDateBetween(taxIdentifier, startDate, endDate)
+
+        assertEquals(1, schedules.size)
+        val schedule = schedules[0]
+        assertEquals("123e4567e89b12d3a456426614", schedule.id)
+        assertEquals(taxIdentifier, schedule.taxIdentifier)
+        assertEquals(LocalDate.of(2025, 7, 1), schedule.startDate)
+    }
+
+    @Test
+    fun `findByTaxIdentifierAndEndDateBetween should return schedules for existing CNPJ and end date in range`() {
+        val taxIdentifier = "12345678000397"
+        val startDate = LocalDate.of(2025, 8, 1)
+        val endDate = LocalDate.of(2025, 8, 15)
+        whenever(repository.findByTaxIdentifierAndEndDateBetween(taxIdentifier, startDate, endDate))
+            .thenReturn(testSchedules.filter {
+                it.taxIdentifier == taxIdentifier &&
+                it.endDate in startDate..endDate
+            })
+
+        val schedules = dataAccess.findByTaxIdentifierAndEndDateBetween(taxIdentifier, startDate, endDate)
+
+        assertEquals(1, schedules.size)
+        val schedule = schedules[0]
+        assertEquals("423e4567e89b12d3a456426614", schedule.id)
+        assertEquals(taxIdentifier, schedule.taxIdentifier)
+        assertEquals(LocalDate.of(2025, 8, 10), schedule.endDate)
+    }
+
+    @Test
+    fun `findByTaxIdentifierAndDateOverlap should return empty list for non-existent CNPJ`() {
+        val taxIdentifier = "99999999000199"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+        whenever(repository.findByTaxIdentifierAndDateOverlap(taxIdentifier, startDate, endDate))
+            .thenReturn(emptyList())
+
+        val schedules = dataAccess.findByTaxIdentifierAndDateOverlap(taxIdentifier, startDate, endDate)
+
+        assertTrue(schedules.isEmpty())
+    }
+
+    @Test
+    fun `findByTaxIdentifierAndDateOverlap should throw IllegalArgumentException for invalid CNPJ`() {
+        val invalidTaxIdentifier = "123456789"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+        val exception = assertThrows<IllegalArgumentException> {
+            dataAccess.findByTaxIdentifierAndDateOverlap(invalidTaxIdentifier, startDate, endDate)
+        }
+        assertEquals("Tax identifier must be a 14-digit CNPJ", exception.message)
+    }
+
+    @Test
+    fun `findByTaxIdentifierAndDateOverlap should throw IllegalArgumentException for invalid date range`() {
+        val taxIdentifier = "12345678000195"
+        val startDate = LocalDate.of(2025, 7, 31)
+        val endDate = LocalDate.of(2025, 7, 1)
+        val exception = assertThrows<IllegalArgumentException> {
+            dataAccess.findByTaxIdentifierAndDateOverlap(taxIdentifier, startDate, endDate)
+        }
+        assertEquals("Start date must not be after end date", exception.message)
+    }
+
+    @Test
+    fun `findByTaxIdentifierAndDateOverlap should return empty schedules for negative cache case`() {
+        val taxIdentifier = "98765432000188"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+        whenever(repository.findByTaxIdentifierAndDateOverlap(taxIdentifier, startDate, endDate))
+            .thenReturn(testSchedules.filter {
+                it.taxIdentifier == taxIdentifier &&
+                it.startDate <= endDate && it.endDate >= startDate
+            })
+
+        val schedules = dataAccess.findByTaxIdentifierAndDateOverlap(taxIdentifier, startDate, endDate)
+
+        assertEquals(1, schedules.size)
+        val schedule = schedules[0]
+        assertEquals("323e4567e89b12d3a456426614", schedule.id)
+        assertEquals(taxIdentifier, schedule.taxIdentifier)
+        assertEquals("[]", schedule.schedules)
+        assertEquals(LocalDate.of(2025, 7, 1), schedule.startDate)
+        assertEquals(LocalDate.of(2025, 7, 31), schedule.endDate)
+    }
+
+    @Test
+    fun `findByRootTaxIdentifierAndDateOverlap should return schedules for existing root CNPJ and overlapping date range`() {
+        val rootTaxIdentifier = "12345678"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+        whenever(repository.findByRootTaxIdentifierAndDateOverlap(rootTaxIdentifier, startDate, endDate))
+            .thenReturn(testSchedules.filter {
+                it.taxIdentifier.startsWith(rootTaxIdentifier) &&
+                it.startDate <= endDate && it.endDate >= startDate
+            })
+
+        val schedules = dataAccess.findByRootTaxIdentifierAndDateOverlap(rootTaxIdentifier, startDate, endDate)
+
+        assertEquals(3, schedules.size)
+        val taxIdentifiers = schedules.map { it.taxIdentifier }.toSet()
+        assertEquals(setOf("12345678000195", "12345678000296", "12345678000397"), taxIdentifiers)
+        schedules.forEach { schedule ->
+            assertTrue(schedule.startDate <= endDate && schedule.endDate >= startDate)
+        }
+    }
+
+    @Test
+    fun `findByRootTaxIdentifierAndStartDateBetween should return schedules for existing root CNPJ and start date in range`() {
+        val rootTaxIdentifier = "12345678"
+        val startDate = LocalDate.of(2025, 6, 30)
+        val endDate = LocalDate.of(2025, 7, 2)
+        whenever(repository.findByRootTaxIdentifierAndStartDateBetween(rootTaxIdentifier, startDate, endDate))
+            .thenReturn(testSchedules.filter {
+                it.taxIdentifier.startsWith(rootTaxIdentifier) &&
+                it.startDate in startDate..endDate
+            })
+
+        val schedules = dataAccess.findByRootTaxIdentifierAndStartDateBetween(rootTaxIdentifier, startDate, endDate)
+
+        assertEquals(1, schedules.size)
+        val schedule = schedules[0]
+        assertEquals("123e4567e89b12d3a456426614", schedule.id)
+        assertEquals("12345678000195", schedule.taxIdentifier)
+        assertEquals(LocalDate.of(2025, 7, 1), schedule.startDate)
+    }
+
+    @Test
+    fun `findByRootTaxIdentifierAndEndDateBetween should return schedules for existing root CNPJ and end date in range`() {
+        val rootTaxIdentifier = "12345678"
+        val startDate = LocalDate.of(2025, 8, 1)
+        val endDate = LocalDate.of(2025, 8, 15)
+        whenever(repository.findByRootTaxIdentifierAndEndDateBetween(rootTaxIdentifier, startDate, endDate))
+            .thenReturn(testSchedules.filter {
+                it.taxIdentifier.startsWith(rootTaxIdentifier) &&
+                it.endDate in startDate..endDate
+            })
+
+        val schedules = dataAccess.findByRootTaxIdentifierAndEndDateBetween(rootTaxIdentifier, startDate, endDate)
+
+        assertEquals(1, schedules.size)
+        val schedule = schedules[0]
+        assertEquals("423e4567e89b12d3a456426614", schedule.id)
+        assertEquals("12345678000397", schedule.taxIdentifier)
+        assertEquals(LocalDate.of(2025, 8, 10), schedule.endDate)
+    }
+
+    @Test
+    fun `findByRootTaxIdentifierAndDateOverlap should return empty list for non-existent root CNPJ`() {
+        val rootTaxIdentifier = "88888888"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+        whenever(repository.findByRootTaxIdentifierAndDateOverlap(rootTaxIdentifier, startDate, endDate))
+            .thenReturn(emptyList())
+
+        val schedules = dataAccess.findByRootTaxIdentifierAndDateOverlap(rootTaxIdentifier, startDate, endDate)
+
+        assertTrue(schedules.isEmpty())
+    }
+
+    @Test
+    fun `findByRootTaxIdentifierAndDateOverlap should throw IllegalArgumentException for invalid root CNPJ`() {
+        val invalidRootTaxIdentifier = "1234567"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+        val exception = assertThrows<IllegalArgumentException> {
+            dataAccess.findByRootTaxIdentifierAndDateOverlap(invalidRootTaxIdentifier, startDate, endDate)
+        }
+        assertEquals("Root tax identifier must be an 8-digit CNPJ root", exception.message)
+    }
+
+    @Test
+    fun `findByCompositeKeyAndDateOverlap should return schedule for existing composite key and overlapping date range`() {
+        val taxIdentifier = "12345678000296"
+        val register = "NUCLEA"
+        val arrangement = "MAS"
+        val accreditor = "REDECARD"
+        val source = "FILE"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+        whenever(repository.findByCompositeKeyAndDateOverlap(taxIdentifier, register, arrangement, accreditor, source, startDate, endDate))
+            .thenReturn(testSchedules.filter {
+                it.taxIdentifier == taxIdentifier &&
+                it.register == register &&
+                it.arrangement == arrangement &&
+                it.accreditor == accreditor &&
+                it.source == source &&
+                it.startDate <= endDate && it.endDate >= startDate
+            })
+
+        val schedules = dataAccess.findByCompositeKeyAndDateOverlap(taxIdentifier, register, arrangement, accreditor, source, startDate, endDate)
+
+        assertEquals(1, schedules.size)
+        val schedule = schedules[0]
+        assertEquals("223e4567e89b12d3a456426614", schedule.id)
+        assertEquals(taxIdentifier, schedule.taxIdentifier)
+        assertEquals(register, schedule.register)
+        assertEquals(arrangement, schedule.arrangement)
+        assertEquals(accreditor, schedule.accreditor)
+        assertEquals(source, schedule.source)
+        assertEquals("""[{"date": "2025-07-02", "amount": 1500.25}]""", schedule.schedules)
+        assertEquals(LocalDate.of(2025, 6, 15), schedule.startDate)
+        assertEquals(LocalDate.of(2025, 7, 15), schedule.endDate)
+    }
+
+    @Test
+    fun `findByCompositeKeyAndDateOverlap should return empty list for non-existent composite key`() {
+        val taxIdentifier = "99999999000199"
+        val register = "CERC"
+        val arrangement = "VIS"
+        val accreditor = "CIELO"
+        val source = "ONLINE"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+        whenever(repository.findByCompositeKeyAndDateOverlap(taxIdentifier, register, arrangement, accreditor, source, startDate, endDate))
+            .thenReturn(emptyList())
+
+        val schedules = dataAccess.findByCompositeKeyAndDateOverlap(taxIdentifier, register, arrangement, accreditor, source, startDate, endDate)
+
+        assertTrue(schedules.isEmpty())
+    }
+
+    @Test
+    fun `findByCompositeKeyAndDateOverlap should throw IllegalArgumentException for invalid inputs`() {
+        val validTaxIdentifier = "12345678000195"
+        val invalidRegister = "CERC".padEnd(21, 'X')
+        val validArrangement = "VIS"
+        val validAccreditor = "CIELO"
+        val validSource = "ONLINE"
+        val startDate = LocalDate.of(2025, 7, 1)
+        val endDate = LocalDate.of(2025, 7, 31)
+
+        val exception = assertThrows<IllegalArgumentException> {
+            dataAccess.findByCompositeKeyAndDateOverlap(validTaxIdentifier, invalidRegister, validArrangement, validAccreditor, validSource, startDate, endDate)
+        }
+        assertEquals("Register must not exceed 20 characters", exception.message)
+    }
+}
+```
+
+
 
 
 
