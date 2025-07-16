@@ -108,23 +108,48 @@ Agradeço o seu interesse em meu perfil. Estou sempre aberto a novas oportunidad
 
 
 ```kotlin
+package com.finapp.dataaccess
+
+import com.finapp.repository.CardReceivablesSchedule
+import com.finapp.repository.CardReceivablesScheduleRepository
+import org.springframework.stereotype.Component
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.util.UUID
+
+// Data Access Interface
+interface CardReceivablesScheduleDataAccess {
+    fun findByTaxIdentifier(taxIdentifier: String): List<CardReceivablesSchedule>
+    fun findByRootTaxIdentifier(rootTaxIdentifier: String): List<CardReceivablesSchedule>
+}
+
+// Implementation
+@Component
+class CardReceivablesScheduleDataAccessImpl(
+    private val repository: CardReceivablesScheduleRepository
+) : CardReceivablesScheduleDataAccess {
+
+    override fun findByTaxIdentifier(taxIdentifier: String): List<CardReceivablesSchedule> {
+        require(taxIdentifier.matches(Regex("\\d{14}"))) { "Tax identifier must be a 14-digit CNPJ" }
+        return repository.findByTaxIdentifier(taxIdentifier)
+    }
+
+    override fun findByRootTaxIdentifier(rootTaxIdentifier: String): List<CardReceivablesSchedule> {
+        require(rootTaxIdentifier.matches(Regex("\\d{8}"))) { "Root tax identifier must be an 8-digit CNPJ root" }
+        return repository.findByRootTaxIdentifier(rootTaxIdentifier)
+    }
+}
+
+// For reference: Entity and Repository (unchanged from previous)
 package com.finapp.repository
 
 import jakarta.persistence.*
 import org.hibernate.annotations.CreationTimestamp
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
-import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.time.LocalDateTime
 
-// Enums
-enum class SourceType {
-    ONLINE, FILE
-}
-
-// Entity
 @Entity
 @Table(name = "card_receivables_schedules")
 data class CardReceivablesSchedule(
@@ -145,7 +170,7 @@ data class CardReceivablesSchedule(
     val accreditor: String,
 
     @Column(length = 20, nullable = false)
-    val source: String, // Changed to String to match VARCHAR(20) in schema
+    val source: String,
 
     @Column(name = "start_date", nullable = false)
     val startDate: LocalDate,
@@ -161,8 +186,9 @@ data class CardReceivablesSchedule(
     val createdAt: LocalDateTime? = null
 )
 
-// Repository
-interface CardReceivablesScheduleRepository : JpaRepository<CardReceivablesSchedule, String> {
+interface Card અ
+
+System: ReceivablesScheduleRepository : JpaRepository<CardReceivablesSchedule, String> {
     
     @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier = :taxIdentifier")
     fun findByTaxIdentifier(taxIdentifier: String): List<CardReceivablesSchedule>
@@ -180,84 +206,6 @@ interface CardReceivablesScheduleRepository : JpaRepository<CardReceivablesSched
         accreditor: String,
         source: String
     ): List<CardReceivablesSchedule>
-}
-
-// Service
-@Service
-class CardReceivablesScheduleService(
-    private val repository: CardReceivablesScheduleRepository
-) {
-    fun saveSchedule(schedule: CardReceivablesSchedule): CardReceivablesSchedule {
-        val scheduleToSave = schedule.copy(
-            schedules = schedule.schedules.takeIf { it.isNotEmpty() } ?: "[]"
-        )
-        return repository.save(scheduleToSave)
-    }
-
-    fun getSchedulesByTaxIdentifier(taxIdentifier: String): List<CardReceivablesSchedule> {
-        val schedules = repository.findByTaxIdentifier(taxIdentifier)
-        if (schedules.isNotEmpty()) {
-            return schedules
-        }
-        // Negative caching: Save an empty schedule and return it
-        val emptySchedule = createEmptySchedule(taxIdentifier)
-        repository.save(emptySchedule)
-        return listOf(emptySchedule)
-    }
-
-    fun getSchedulesByRootTaxIdentifier(rootTaxIdentifier: String): List<CardReceivablesSchedule> {
-        require(rootTaxIdentifier.length >= 8) { "Root tax identifier must be at least 8 digits" }
-        val schedules = repository.findByRootTaxIdentifier(rootTaxIdentifier)
-        if (schedules.isNotEmpty()) {
-            return schedules
-        }
-        // Negative caching: Save an empty schedule for a padded CNPJ and return it
-        val paddedCnpj = rootTaxIdentifier.padEnd(14, '0')
-        val emptySchedule = createEmptySchedule(paddedCnpj)
-        repository.save(emptySchedule)
-        return listOf(emptySchedule)
-    }
-
-    fun getSchedulesByCompositeKey(
-        taxIdentifier: String,
-        register: String,
-        arrangement: String,
-        accreditor: String,
-        source: String
-    ): List<CardReceivablesSchedule> {
-        val schedules = repository.findByCompositeKey(taxIdentifier, register, arrangement, accreditor, source)
-        if (schedules.isNotEmpty()) {
-            return schedules
-        }
-        // Negative caching: Save an empty schedule and return it
-        val emptySchedule = CardReceivablesSchedule(
-            id = UUID.randomUUID().toString().replace("-", "").substring(0, 26),
-            taxIdentifier = taxIdentifier,
-            register = register,
-            arrangement = arrangement,
-            accreditor = accreditor,
-            source = source,
-            startDate = LocalDate.now(),
-            endDate = LocalDate.now(),
-            schedules = "[]"
-        )
-        repository.save(emptySchedule)
-        return listOf(emptySchedule)
-    }
-
-    private fun createEmptySchedule(taxIdentifier: String): CardReceivablesSchedule {
-        return CardReceivablesSchedule(
-            id = UUID.randomUUID().toString().replace("-", "").substring(0, 26),
-            taxIdentifier = taxIdentifier,
-            register = "",
-            arrangement = "",
-            accreditor = "",
-            source = "ONLINE", // Default to ONLINE as per schema
-            startDate = LocalDate.now(),
-            endDate = LocalDate.now(),
-            schedules = "[]"
-        )
-    }
 }
 ```
 
