@@ -107,72 +107,51 @@ Agradeço o seu interesse em meu perfil. Estou sempre aberto a novas oportunidad
 
 
 
--- Insert test data for card_receivables_schedules
+-- Insert a new schedule
 INSERT INTO card_receivables_schedules (
     id, tax_identifier, register, arrangement, accreditor, source, start_date, end_date, schedules, created_at
-) VALUES
-    -- Test case 1: Regular schedule with valid data
-    (
-        '123e4567e89b12d3a456426614',
-        '12345678000195',
-        'CERC',
-        'VIS',
-        'CIELO',
-        'ONLINE',
-        '2025-07-01',
-        '2025-07-31',
-        '[{"date": "2025-07-01", "amount": 1000.50}, {"date": "2025-07-15", "amount": 2000.75}]',
-        '2025-07-15 10:00:00'
-    ),
-    -- Test case 2: Same root CNPJ, different branch
-    (
-        '223e4567e89b12d3a456426614',
-        '12345678000296',
-        'NUCLEA',
-        'MAS',
-        'REDECARD',
-        'FILE',
-        '2025-07-01',
-        '2025-07-31',
-        '[{"date": "2025-07-02", "amount": 1500.25}]',
-        '2025-07-15 10:01:00'
-    ),
-    -- Test case 3: Different CNPJ, empty schedule (negative cache)
-    (
-        '323e4567e89b12d3a456426614',
-        '98765432000188',
-        'CERC',
-        'VIS',
-        'CIELO',
-        'ONLINE',
-        '2025-07-01',
-        '2025-07-31',
-        '[]',
-        '2025-07-15 10:02:00'
-    ),
-    -- Test case 4: Different arrangement, same CNPJ root
-    (
-        '423e4567e89b12d3a456426614',
-        '12345678000397',
-        'CERC',
-        'AME',
-        'GETNET',
-        'FILE',
-        '2025-07-01',
-        '2025-07-31',
-        '[{"date": "2025-07-03", "amount": 3000.00}]',
-        '2025-07-15 10:03:00'
-    ),
-    -- Test case 5: Different accreditor
-    (
-        '523e4567e89b12d3a456426614',
-        '45678912000177',
-        'NUCLEA',
-        'MAS',
-        'STONE',
-        'ONLINE',
-        '2025-07-01',
-        '2025-07-31',
-        '[{"date": "2025-07-04", "amount": 2500.30}, {"date": "2025-07-05", "amount": 1800.60}]',
-        '2025-07-15 10:04:00'
-    );
+) VALUES (
+    '623e4567e89b12d3a456426614',
+    '78912345000166',
+    'CERC',
+    'VIS',
+    'CIELO',
+    'ONLINE',
+    '2025-08-01',
+    '2025-08-31',
+    '[{"date": "2025-08-01", "amount": 5000.00}]',
+    CURRENT_TIMESTAMP
+);
+
+-- Verify the inserted record
+SELECT * FROM card_receivables_schedules WHERE id = '623e4567e89b12d3a456426614';
+
+
+SELECT id, tax_identifier, register, arrangement, accreditor, source, start_date, end_date, schedules, created_at
+FROM card_receivables_schedules
+WHERE tax_identifier = '12345678000195';
+
+
+SELECT id, tax_identifier, register, arrangement, accreditor, source, start_date, end_date, schedules, created_at
+FROM card_receivables_schedules
+WHERE SUBSTRING(tax_identifier, 1, 8) = '12345678';
+
+
+SELECT id, tax_identifier, register, arrangement, accreditor, source, start_date, end_date, schedules, created_at
+FROM card_receivables_schedules
+WHERE tax_identifier = '12345678000195'
+  AND register = 'CERC'
+  AND arrangement = 'VIS'
+  AND accreditor = 'CIELO'
+  AND source = 'ONLINE';
+
+-- Check index usage for full CNPJ
+EXPLAIN ANALYZE
+SELECT * FROM card_receivables_schedules
+WHERE tax_identifier = '12345678000195';
+
+-- Check index usage for root CNPJ
+EXPLAIN ANALYZE
+SELECT * FROM card_receivables_schedules
+WHERE SUBSTRING(tax_identifier, 1, 8) = '12345678';
+
