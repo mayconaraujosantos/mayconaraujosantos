@@ -155,3 +155,158 @@ EXPLAIN ANALYZE
 SELECT * FROM card_receivables_schedules
 WHERE SUBSTRING(tax_identifier, 1, 8) = '12345678';
 
+```kotlin
+package com.finapp.repository
+
+import jakarta.persistence.*
+import org.hibernate.annotations.CreationTimestamp
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.util.UUID
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.stereotype.Service
+
+// Enums
+enum class SourceType {
+    ONLINE, FILE
+}
+
+// Entity
+@Entity
+@Table(name = "card_receivables_schedules")
+data class CardReceivablesSchedule(
+    @Id
+    @Column(length = 26)
+    val id: String,
+
+    @Column(name = "tax_identifier", length = 26, nullable = false)
+    val taxIdentifier: String,
+
+    @Column(length = 20, nullable = false)
+    val register: String,
+
+    @Column(length = 3, nullable = false)
+    val arrangement: String,
+
+    @Column(length = 20, nullable = false)
+    val accreditor: String,
+
+    @Column(length = 20, nullable = false)
+    val source: String, // Changed to String to match VARCHAR(20) in schema
+
+    @Column(name = "start_date", nullable = false)
+    val startDate: LocalDate,
+
+    @Column(name = "end_date", nullable = false)
+    val endDate: LocalDate,
+
+    @Column(columnDefinition = "jsonb", nullable = false)
+    val schedules: String,
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false)
+    val createdAt: LocalDateTime? = null
+)
+
+// Repository
+interface CardReceivablesScheduleRepository : JpaRepository<CardReceivablesSchedule, String> {
+    
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier = :taxIdentifier")
+    fun findByTaxIdentifier(taxIdentifier: String): List<CardReceivablesSchedule>
+    
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE SUBSTRING(c.taxIdentifier, 1, 8) = :rootTaxIdentifier")
+    fun findByRootTaxIdentifier(rootTaxIdentifier: String): List<CardReceivablesSchedule>
+    
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier = :taxIdentifier " +
+           "AND c.register = :register AND c.arrangement = :arrangement " +
+           "AND c.accreditor = :accreditor AND c.source = :source")
+    fun findByCompositeKey(
+        taxIdentifier: String,
+        register: String,
+        arrangement: String,
+        accreditor: String,
+        source: String
+    ): List<CardReceivablesSchedule>
+}
+
+// Service
+@Service
+class CardReceivablesScheduleService(
+    private val repository: CardReceivablesScheduleRepository
+) {
+    fun saveSchedule(schedule: CardReceivablesSchedule): CardReceivablesSchedule {
+        val scheduleToSave = schedule.copy(
+            schedules = schedule.schedules.takeIf { it.isNotEmpty() } ?: "[]"
+        )
+        return repository.save(scheduleToSave)
+    }
+
+    fun getSchedulesByTaxIdentifier(taxIdentifier: String): List<CardReceivablesSchedule> {
+        val schedules = repository.findByTaxIdentifier(taxIdentifier)
+        if (schedules.isNotEmpty()) {
+            return schedules
+        }
+        // Negative caching: Save an empty schedule and return it
+        val emptySchedule = createEmptySchedule(taxIdentifier)
+        repository.save(emptySchedule)
+        return listOf(emptySchedule)
+    }
+
+    fun getSchedulesByRootTaxIdentifier(rootTaxIdentifier: String): List<CardReceivablesSchedule> {
+        require(rootTaxIdentifier.length >= 8) { "Root tax identifier must be at least 8 digits" }
+        val schedules = repository.findByRootTaxIdentifier(rootTaxIdentifier)
+        if (schedules.isNotEmpty()) {
+            return schedules
+        }
+        // Negative caching: Save an empty schedule for a padded CNPJ and return it
+        val paddedCnpj = rootTaxIdentifier.padEnd(14, '0')
+        val emptySchedule = createEmptySchedule(paddedCnpj)
+        repository.save(emptySchedule)
+        return listOf(emptySchedule)
+    }
+
+    fun getSchedulesByCompositeKey(
+        taxIdentifier: String,
+        register: String,
+        arrangement: String,
+        accreditor: String,
+        source: String
+    ): List<CardReceivablesSchedule> {
+        val schedules = repository.findByCompositeKey(taxIdentifier, register, arrangement, accreditor, source)
+        if (schedules.isNotEmpty()) {
+            return schedules
+        }
+        // Negative caching: Save an empty schedule and return it
+        val emptySchedule = CardReceivablesSchedule(
+            id = UUID.randomUUID().toString().replace("-", "").substring(0, 26),
+            taxIdentifier = taxIdentifier,
+            register = register,
+            arrangement = arrangement,
+            accreditor = accreditor,
+            source = source,
+            startDate = LocalDate.now(),
+            endDate = LocalDate.now(),
+            schedules = "[]"
+        )
+        repository.save(emptySchedule)
+        return listOf(emptySchedule)
+    }
+
+    private fun createEmptySchedule(taxIdentifier: String): CardReceivablesSchedule {
+        return CardReceivablesSchedule(
+            id = UUID.randomUUID().toString().replace("-", "").substring(0, 26),
+            taxIdentifier = taxIdentifier,
+            register = "",
+            arrangement = "",
+            accreditor = "",
+            source = "ONLINE", // Default to ONLINE as per schema
+            startDate = LocalDate.now(),
+            endDate = LocalDate.now(),
+            schedules = "[]"
+        )
+    }
+}
+```
+
+
