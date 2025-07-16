@@ -107,54 +107,6 @@ Agradeço o seu interesse em meu perfil. Estou sempre aberto a novas oportunidad
 
 
 
--- Insert a new schedule
-INSERT INTO card_receivables_schedules (
-    id, tax_identifier, register, arrangement, accreditor, source, start_date, end_date, schedules, created_at
-) VALUES (
-    '623e4567e89b12d3a456426614',
-    '78912345000166',
-    'CERC',
-    'VIS',
-    'CIELO',
-    'ONLINE',
-    '2025-08-01',
-    '2025-08-31',
-    '[{"date": "2025-08-01", "amount": 5000.00}]',
-    CURRENT_TIMESTAMP
-);
-
--- Verify the inserted record
-SELECT * FROM card_receivables_schedules WHERE id = '623e4567e89b12d3a456426614';
-
-
-SELECT id, tax_identifier, register, arrangement, accreditor, source, start_date, end_date, schedules, created_at
-FROM card_receivables_schedules
-WHERE tax_identifier = '12345678000195';
-
-
-SELECT id, tax_identifier, register, arrangement, accreditor, source, start_date, end_date, schedules, created_at
-FROM card_receivables_schedules
-WHERE SUBSTRING(tax_identifier, 1, 8) = '12345678';
-
-
-SELECT id, tax_identifier, register, arrangement, accreditor, source, start_date, end_date, schedules, created_at
-FROM card_receivables_schedules
-WHERE tax_identifier = '12345678000195'
-  AND register = 'CERC'
-  AND arrangement = 'VIS'
-  AND accreditor = 'CIELO'
-  AND source = 'ONLINE';
-
--- Check index usage for full CNPJ
-EXPLAIN ANALYZE
-SELECT * FROM card_receivables_schedules
-WHERE tax_identifier = '12345678000195';
-
--- Check index usage for root CNPJ
-EXPLAIN ANALYZE
-SELECT * FROM card_receivables_schedules
-WHERE SUBSTRING(tax_identifier, 1, 8) = '12345678';
-
 ```kotlin
 package com.finapp.repository
 
