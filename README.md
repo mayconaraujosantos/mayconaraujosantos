@@ -418,6 +418,252 @@ interface CardReceivableScheduleRepository :
 
 ```
 
+```kotlin
+   package com.c6bak.finappguaranteecardreceivables.resources.repositories
+
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import org.springframework.stereotype.Repository
+
+@Repository
+interface CardReceivablesScheduleRepository : JpaRepository<CardReceivablesScheduleTable, String> {
+
+  // Save schedules (herdado do JpaRepository - save() method)
+
+  // Get schedules pelo CNPJ inteiro
+  fun findByTaxIdentifier(taxIdentifier: String): List<CardReceivablesScheduleTable>
+
+  // Get schedules pelo CNPJ raiz (primeiros 9 dígitos)
+  @Query(
+          """
+        SELECT c FROM CardReceivablesScheduleTable c
+        WHERE SUBSTRING(c.taxIdentifier, 1, 9) = :rootTaxIdentifier
+    """
+  )
+  fun findByRootTaxIdentifier(
+          @Param("rootTaxIdentifier") rootTaxIdentifier: String
+  ): List<CardReceivablesScheduleTable>
+
+  // Consulta por chave composta (registradora, arranjo, credenciador, fonte, cnpj)
+  fun findByRegisterAndArrangementAndAccreditorAndSourceAndTaxIdentifier(
+          register: String,
+          arrangement: String,
+          accreditor: String,
+          source: String,
+          taxIdentifier: String
+  ): List<CardReceivablesScheduleTable>
+
+  // Consulta por CNPJ raiz usando chave composta
+  @Query(
+          """
+        SELECT c FROM CardReceivablesScheduleTable c
+        WHERE c.register = :register
+        AND c.arrangement = :arrangement
+        AND c.accreditor = :accreditor
+        AND c.source = :source
+        AND SUBSTRING(c.taxIdentifier, 1, 9) = :rootTaxIdentifier
+    """
+  )
+  fun findByCompositeKeyAndRootTaxIdentifier(
+          @Param("register") register: String,
+          @Param("arrangement") arrangement: String,
+          @Param("accreditor") accreditor: String,
+          @Param("source") source: String,
+          @Param("rootTaxIdentifier") rootTaxIdentifier: String
+  ): List<CardReceivablesScheduleTable>
+}
+
+package com.c6bak.finappguaranteecardreceivables.dataaccess
+
+import com.c6bak.finappguaranteecardreceivables.domain.entities.CardReceivablesSchedule
+import com.c6bak.finappguaranteecardreceivables.domain.entities.Register
+import com.c6bak.finappguaranteecardreceivables.domain.entities.Source
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.CardReceivablesScheduleRepository
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
+import java.time.LocalDate
+import org.springframework.stereotype.Component
+
+private val objectMapper = jacksonObjectMapper()
+
+@Component
+class CardReceivablesScheduleDataAccessImpl(
+        private val repository: CardReceivablesScheduleRepository
+) : CardReceivablesScheduleDataAccess {
+
+  override fun existsByTaxIdentifier(taxIdentifier: String): Boolean {
+    return repository.findByTaxIdentifier(taxIdentifier).isNotEmpty()
+  }
+
+  override fun existsByRootTaxIdentifier(rootTaxIdentifier: String): Boolean {
+    return repository.findByRootTaxIdentifier(rootTaxIdentifier).isNotEmpty()
+  }
+
+  override fun existsByCompositeKey(
+          register: Register,
+          arrangement: String,
+          accreditor: String,
+          source: Source,
+          taxIdentifier: String
+  ): Boolean {
+    return repository
+            .findByRegisterAndArrangementAndAccreditorAndSourceAndTaxIdentifier(
+                    register.value,
+                    arrangement,
+                    accreditor,
+                    source.value,
+                    taxIdentifier
+            )
+            .isNotEmpty()
+  }
+
+  override fun existsByCompositeKeyAndRootTaxIdentifier(
+          register: Register,
+          arrangement: String,
+          accreditor: String,
+          source: Source,
+          rootTaxIdentifier: String
+  ): Boolean {
+    return repository
+            .findByCompositeKeyAndRootTaxIdentifier(
+                    register.value,
+                    arrangement,
+                    accreditor,
+                    source.value,
+                    rootTaxIdentifier
+            )
+            .isNotEmpty()
+  }
+
+  override fun findSchedulesByTaxIdentifier(
+          taxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesSchedule> {
+    return repository.findByTaxIdentifier(taxIdentifier).map { it.toDomainEntity() }.filter {
+      it.startDate >= startDate && it.endDate <= endDate
+    }
+  }
+
+  override fun findSchedulesByRootTaxIdentifier(
+          rootTaxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesSchedule> {
+    return repository
+            .findByRootTaxIdentifier(rootTaxIdentifier)
+            .map { it.toDomainEntity() }
+            .filter { it.startDate >= startDate && it.endDate <= endDate }
+  }
+
+  override fun findSchedulesByCompositeKey(
+          register: Register,
+          arrangement: String,
+          accreditor: String,
+          source: Source,
+          taxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesSchedule> {
+    return repository
+            .findByRegisterAndArrangementAndAccreditorAndSourceAndTaxIdentifier(
+                    register.value,
+                    arrangement,
+                    accreditor,
+                    source.value,
+                    taxIdentifier
+            )
+            .map { it.toDomainEntity() }
+            .filter { it.startDate >= startDate && it.endDate <= endDate }
+  }
+
+  override fun saveSchedules(schedules: List<CardReceivablesSchedule>) {
+    val entities = schedules.map { it.toTableEntity() }
+    repository.saveAll(entities)
+  }
+}
+
+// Extensions para conversão entre entidades
+private fun CardReceivablesScheduleTable.toDomainEntity(): CardReceivablesSchedule {
+  return CardReceivablesSchedule(
+          id = this.id,
+          taxIdentifier = this.taxIdentifier,
+          register = Register.valueOf(this.register),
+          arrangement = this.arrangement,
+          accreditor = this.accreditor,
+          source = Source.valueOf(this.source),
+          startDate = this.startDate,
+          endDate = this.endDate,
+          schedules = objectMapper.readValue(this.schedules),
+          createdAt = this.createdAt
+  )
+}
+
+private fun CardReceivablesSchedule.toTableEntity(): CardReceivablesScheduleTable {
+  return CardReceivablesScheduleTable(
+          id = this.id,
+          register = this.register.value,
+          arrangement = this.arrangement,
+          accreditor = this.accreditor,
+          source = this.source.value,
+          taxIdentifier = this.taxIdentifier,
+          startDate = this.startDate,
+          endDate = this.endDate,
+          schedules = objectMapper.writeValueAsString(this.schedules),
+          createdAt = this.createdAt
+  )
+}
+package com.c6bak.finappguaranteecardreceivables.dataaccess
+
+import com.c6bak.finappguaranteecardreceivables.domain.entities.CardReceivablesSchedule
+import com.c6bak.finappguaranteecardreceivables.domain.entities.Register
+import com.c6bak.finappguaranteecardreceivables.domain.entities.Source
+import java.time.LocalDate
+
+interface CardReceivablesScheduleDataAccess {
+  fun existsByTaxIdentifier(taxIdentifier: String): Boolean
+  fun existsByRootTaxIdentifier(rootTaxIdentifier: String): Boolean
+  fun existsByCompositeKey(
+          register: Register,
+          arrangement: String,
+          accreditor: String,
+          source: Source,
+          taxIdentifier: String
+  ): Boolean
+  fun existsByCompositeKeyAndRootTaxIdentifier(
+          register: Register,
+          arrangement: String,
+          accreditor: String,
+          source: Source,
+          rootTaxIdentifier: String
+  ): Boolean
+  fun findSchedulesByTaxIdentifier(
+          taxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesSchedule>
+  fun findSchedulesByRootTaxIdentifier(
+          rootTaxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesSchedule>
+  fun findSchedulesByCompositeKey(
+          register: Register,
+          arrangement: String,
+          accreditor: String,
+          source: Source,
+          taxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesSchedule>
+  fun saveSchedules(schedules: List<CardReceivablesSchedule>)
+}
+
+
+```
 
 
 
