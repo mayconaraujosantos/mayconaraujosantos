@@ -220,6 +220,103 @@ class CardReceivableScheduleRepositoryImpl : CustomCardReceivableScheduleReposit
 }
 ```
 
+```kotlin
+
+
+package com.finapp.guaranteecard.entities
+
+import com.finapp.guaranteecard.domain.CardReceivableSchedule
+import jakarta.persistence.*
+import java.time.Instant
+import java.time.LocalDate
+
+@Entity
+@Table(name = "card_receivables_schedules")
+data class CardReceivableScheduleEntity(
+    @Id
+    val id: String,
+    
+    @Column(nullable = false)
+    val register: String,
+    
+    @Column(nullable = false, length = 3)
+    val arrangement: String,
+    
+    @Column(nullable = false)
+    val accreditor: String,
+    
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    val source: CardReceivableSchedule.Source,
+    
+    @Column(name = "tax_identifier", nullable = false)
+    val taxIdentifier: String,
+    
+    @Column(name = "start_date", nullable = false)
+    val startDate: LocalDate,
+    
+    @Column(name = "end_date", nullable = false)
+    val endDate: LocalDate,
+    
+    @Column(nullable = false, columnDefinition = "jsonb")
+    val schedules: String, // JSON string
+    
+    @Column(name = "created_at", nullable = false)
+    val createdAt: Instant = Instant.now()
+) {
+    companion object {
+        fun fromDomain(domain: CardReceivableSchedule): CardReceivableScheduleEntity {
+            return CardReceivableScheduleEntity(
+                id = domain.id,
+                register = domain.register,
+                arrangement = domain.arrangement,
+                accreditor = domain.accreditor,
+                source = domain.source,
+                taxIdentifier = domain.taxIdentifier,
+                startDate = domain.startDate,
+                endDate = domain.endDate,
+                schedules = convertSchedulesToJson(domain.schedules),
+                createdAt = domain.createdAt
+            )
+        }
+        
+        private fun convertSchedulesToJson(schedules: List<CardReceivableSchedule.ScheduleItem>): String {
+            return if (schedules.isEmpty()) "[]" 
+            else {
+                // Implemente a conversão real para JSON aqui
+                // Exemplo com Jackson:
+                // ObjectMapper().writeValueAsString(schedules)
+                "[${schedules.joinToString(",") { """{"date":"${it.date}","amount":${it.amount},"status":"${it.status}"}""" }}]"
+            }
+        }
+    }
+    
+    fun toDomain(): CardReceivableSchedule {
+        return CardReceivableSchedule(
+            id = id,
+            register = register,
+            arrangement = arrangement,
+            accreditor = accreditor,
+            source = source,
+            taxIdentifier = taxIdentifier,
+            startDate = startDate,
+            endDate = endDate,
+            schedules = parseSchedulesFromJson(schedules),
+            createdAt = createdAt
+        )
+    }
+    
+    private fun parseSchedulesFromJson(json: String): List<CardReceivableSchedule.ScheduleItem> {
+        return if (json == "[]") emptyList()
+        else {
+            // Implemente o parsing real do JSON aqui
+            // Exemplo com Jackson:
+            // ObjectMapper().readValue(json, Array<CardReceivableSchedule.ScheduleItem>::class.java).toList()
+            emptyList() // Placeholder - implemente conforme sua biblioteca JSON
+        }
+    }
+}
+```
 
 
 
