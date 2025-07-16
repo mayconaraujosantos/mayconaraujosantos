@@ -351,8 +351,72 @@ interface CustomCardReceivableScheduleRepository {
 
 ```
 
+```kotlin
 
+package com.finapp.guaranteecard.dataaccess
 
+import com.finapp.guaranteecard.domain.CardReceivableSchedule
+import com.finapp.guaranteecard.entities.CardReceivableScheduleEntity
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import org.springframework.stereotype.Repository
+import java.time.LocalDate
+
+@Repository
+interface CardReceivableScheduleRepository : 
+    JpaRepository<CardReceivableScheduleEntity, String>,
+    CustomCardReceivableScheduleRepository {
+    
+    @Query("""
+        SELECT e FROM CardReceivableScheduleEntity e 
+        WHERE e.register = :register 
+        AND e.arrangement = :arrangement 
+        AND e.accreditor = :accreditor 
+        AND e.source = :source 
+        AND e.taxIdentifier = :taxIdentifier
+        AND e.startDate <= :endDate 
+        AND e.endDate >= :startDate
+        AND e.schedules != '[]'
+    """)
+    fun findNonEmptyByCompositeKey(
+        @Param("register") register: String,
+        @Param("arrangement") arrangement: String,
+        @Param("accreditor") accreditor: String,
+        @Param("source") source: CardReceivableSchedule.Source,
+        @Param("taxIdentifier") taxIdentifier: String,
+        @Param("startDate") startDate: LocalDate,
+        @Param("endDate") endDate: LocalDate
+    ): List<CardReceivableScheduleEntity>
+    
+    @Query("""
+        SELECT e FROM CardReceivableScheduleEntity e 
+        WHERE e.taxIdentifier = :taxIdentifier
+        AND e.startDate <= :endDate 
+        AND e.endDate >= :startDate
+        AND e.schedules != '[]'
+    """)
+    fun findNonEmptyByTaxIdentifier(
+        @Param("taxIdentifier") taxIdentifier: String,
+        @Param("startDate") startDate: LocalDate,
+        @Param("endDate") endDate: LocalDate
+    ): List<CardReceivableScheduleEntity>
+    
+    @Query(value = """
+        SELECT e FROM CardReceivableScheduleEntity e 
+        WHERE SUBSTRING(e.taxIdentifier, 1, 8) = :taxIdentifierRoot
+        AND e.startDate <= :endDate 
+        AND e.endDate >= :startDate
+        AND e.schedules != '[]'
+    """, nativeQuery = true)
+    fun findNonEmptyByTaxIdentifierRoot(
+        @Param("taxIdentifierRoot") taxIdentifierRoot: String,
+        @Param("startDate") startDate: LocalDate,
+        @Param("endDate") endDate: LocalDate
+    ): List<CardReceivableScheduleEntity>
+}
+
+```
 
 
 
