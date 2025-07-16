@@ -662,6 +662,118 @@ interface CardReceivablesScheduleDataAccess {
   fun saveSchedules(schedules: List<CardReceivablesSchedule>)
 }
 
+package com.c6bak.finappguaranteecardreceivables.resources.repositories
+
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
+import java.time.LocalDate
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import org.springframework.stereotype.Repository
+
+@Repository
+interface CardReceivablesScheduleRepository : JpaRepository<CardReceivablesScheduleTable, String> {
+
+  // Save schedules (herdado do JpaRepository - save() method)
+
+  // Get schedules pelo CNPJ inteiro
+  fun findByTaxIdentifier(taxIdentifier: String): List<CardReceivablesScheduleTable>
+
+  // Get schedules pelo CNPJ inteiro + intervalo de datas
+  fun findByTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+          taxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesScheduleTable>
+
+  // Get schedules pelo CNPJ raiz (primeiros 9 dígitos)
+  @Query(
+          """
+      SELECT c FROM CardReceivablesScheduleTable c
+      WHERE SUBSTRING(c.taxIdentifier, 1, 9) = :rootTaxIdentifier
+    """
+  )
+  fun findByRootTaxIdentifier(
+          @Param("rootTaxIdentifier") rootTaxIdentifier: String
+  ): List<CardReceivablesScheduleTable>
+
+  // Get schedules pelo CNPJ raiz + intervalo de datas
+  @Query(
+          """
+      SELECT c FROM CardReceivablesScheduleTable c
+      WHERE SUBSTRING(c.taxIdentifier, 1, 9) = :rootTaxIdentifier
+      AND c.startDate >= :startDate
+      AND c.endDate <= :endDate
+    """
+  )
+  fun findByRootTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+          @Param("rootTaxIdentifier") rootTaxIdentifier: String,
+          @Param("startDate") startDate: LocalDate,
+          @Param("endDate") endDate: LocalDate
+  ): List<CardReceivablesScheduleTable>
+
+  // Consulta por chave composta (registradora, arranjo, credenciador, fonte, cnpj)
+  fun findByRegisterAndArrangementAndAccreditorAndSourceAndTaxIdentifier(
+          register: String,
+          arrangement: String,
+          accreditor: String,
+          source: String,
+          taxIdentifier: String
+  ): List<CardReceivablesScheduleTable>
+
+  // Consulta por chave composta + intervalo de datas
+  fun findByRegisterAndArrangementAndAccreditorAndSourceAndTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+          register: String,
+          arrangement: String,
+          accreditor: String,
+          source: String,
+          taxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesScheduleTable>
+
+  // Consulta por CNPJ raiz usando chave composta
+  @Query(
+          """
+      SELECT c FROM CardReceivablesScheduleTable c
+      WHERE c.register = :register
+      AND c.arrangement = :arrangement
+      AND c.accreditor = :accreditor
+      AND c.source = :source
+      AND SUBSTRING(c.taxIdentifier, 1, 9) = :rootTaxIdentifier
+    """
+  )
+  fun findByCompositeKeyAndRootTaxIdentifier(
+          @Param("register") register: String,
+          @Param("arrangement") arrangement: String,
+          @Param("accreditor") accreditor: String,
+          @Param("source") source: String,
+          @Param("rootTaxIdentifier") rootTaxIdentifier: String
+  ): List<CardReceivablesScheduleTable>
+
+  // Consulta por CNPJ raiz usando chave composta + intervalo de datas
+  @Query(
+          """
+      SELECT c FROM CardReceivablesScheduleTable c
+      WHERE c.register = :register
+      AND c.arrangement = :arrangement
+      AND c.accreditor = :accreditor
+      AND c.source = :source
+      AND SUBSTRING(c.taxIdentifier, 1, 9) = :rootTaxIdentifier
+      AND c.startDate >= :startDate
+      AND c.endDate <= :endDate
+    """
+  )
+  fun findByCompositeKeyAndRootTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+          @Param("register") register: String,
+          @Param("arrangement") arrangement: String,
+          @Param("accreditor") accreditor: String,
+          @Param("source") source: String,
+          @Param("rootTaxIdentifier") rootTaxIdentifier: String,
+          @Param("startDate") startDate: LocalDate,
+          @Param("endDate") endDate: LocalDate
+  ): List<CardReceivablesScheduleTable>
+}
 
 ```
 
