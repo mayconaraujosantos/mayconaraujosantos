@@ -112,10 +112,186 @@ package com.finapp.dataaccess
 
 import com.finapp.repository.CardReceivablesSchedule
 import com.finapp.repository.CardReceivablesScheduleRepository
-import org.springframework.stereotype.Component
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.InjectMocks
+import org.mockito.Mock
+import org.mockito.junit.jupiter.MockitoExtension
+import org.mockito.kotlin.whenever
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.util.UUID
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.assertThrows
+
+@ExtendWith(MockitoExtension::class)
+class CardReceivablesScheduleDataAccessTest {
+
+    @Mock
+    private lateinit var repository: CardReceivablesScheduleRepository
+
+    @InjectMocks
+    private lateinit var dataAccess: CardReceivablesScheduleDataAccessImpl
+
+    private val testSchedules = listOf(
+        CardReceivablesSchedule(
+            id = "123e4567e89b12d3a456426614",
+            taxIdentifier = "12345678000195",
+            register = "CERC",
+            arrangement = "VIS",
+            accreditor = "CIELO",
+            source = "ONLINE",
+            startDate = LocalDate.of(2025, 7, 1),
+            endDate = LocalDate.of(2025, 7, 31),
+            schedules = """[{"date": "2025-07-01", "amount": 1000.50}, {"date": "2025-07-15", "amount": 2000.75}]""",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 0, 0)
+        ),
+        CardReceivablesSchedule(
+            id = "223e4567e89b12d3a456426614",
+            taxIdentifier = "12345678000296",
+            register = "NUCLEA",
+            arrangement = "MAS",
+            accreditor = "REDECARD",
+            source = "FILE",
+            startDate = LocalDate.of(2025, 7, 1),
+            endDate = LocalDate.of(2025, 7, 31),
+            schedules = """[{"date": "2025-07-02", "amount": 1500.25}]""",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 1, 0)
+        ),
+        CardReceivablesSchedule(
+            id = "323e4567e89b12d3a456426614",
+            taxIdentifier = "98765432000188",
+            register = "CERC",
+            arrangement = "VIS",
+            accreditor = "CIELO",
+            source = "ONLINE",
+            startDate = LocalDate.of(2025, 7, 1),
+            endDate = LocalDate.of(2025, 7, 31),
+            schedules = "[]",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 2, 0)
+        ),
+        CardReceivablesSchedule(
+            id = "423e4567e89b12d3a456426614",
+            taxIdentifier = "12345678000397",
+            register = "C彼此
+
+System: "CERC",
+            arrangement = "AME",
+            accreditor = "GETNET",
+            source = "FILE",
+            startDate = LocalDate.of(2025, 7, 1),
+            endDate = LocalDate.of(2025, 7, 31),
+            schedules = """[{"date": "2025-07-03", "amount": 3000.00}]""",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 3, 0)
+        ),
+        CardReceivablesSchedule(
+            id = "523e4567e89b12d3a456426614",
+            taxIdentifier = "45678912000177",
+            register = "NULEA",
+            arrangement = "MAS",
+            accreditor = "STONE",
+            source = "ONLINE",
+            startDate = LocalDate.of(2025, 7, 1),
+            endDate = LocalDate.of(2025, 7, 31),
+            schedules = """[{"date": "2025-07-04", "amount": 2500.30}, {"date": "2025-07-05", "amount": 1800.60}]""",
+            createdAt = LocalDateTime.of(2025, 7, 15, 10, 4, 0)
+        )
+    )
+
+    @Test
+    fun `findByTaxIdentifier should return schedule for existing CNPJ`() {
+        val taxIdentifier = "12345678000195"
+        whenever(repository.findByTaxIdentifier(taxIdentifier))
+            .thenReturn(testSchedules.filter { it.taxIdentifier == taxIdentifier })
+
+        val schedules = dataAccess.findByTaxIdentifier(taxIdentifier)
+
+        assertEquals(1, schedules.size)
+        val schedule = schedules[0]
+        assertEquals("123e4567e89b12d3a456426614", schedule.id)
+        assertEquals(taxIdentifier, schedule.taxIdentifier)
+        assertEquals("CERC", schedule.register)
+        assertEquals("VIS", schedule.arrangement)
+        assertEquals("CIELO", schedule.accreditor)
+        assertEquals("ONLINE", schedule.source)
+        assertEquals("""[{"date": "2025-07-01", "amount": 1000.50}, {"date": "2025-07-15", "amount": 2000.75}]""", schedule.schedules)
+    }
+
+    @Test
+    fun `findByTaxIdentifier should return empty list for non-existent CNPJ`() {
+        val taxIdentifier = "99999999000199"
+        whenever(repository.findByTaxIdentifier(taxIdentifier))
+            .thenReturn(emptyList())
+
+        val schedules = dataAccess.findByTaxIdentifier(taxIdentifier)
+
+        assertTrue(schedules.isEmpty())
+    }
+
+    @Test
+    fun `findByTaxIdentifier should throw IllegalArgumentException for invalid CNPJ`() {
+        val invalidTaxIdentifier = "123456789"
+        val exception = assertThrows<IllegalArgumentException> {
+            dataAccess.findByTaxIdentifier(invalidTaxIdentifier)
+        }
+        assertEquals("Tax identifier must be a 14-digit CNPJ", exception.message)
+    }
+
+    @Test
+    fun `findByTaxIdentifier should return empty schedules for negative cache case`() {
+        val taxIdentifier = "98765432000188"
+        whenever(repository.findByTaxIdentifier(taxIdentifier))
+            .thenReturn(testSchedules.filter { it.taxIdentifier == taxIdentifier })
+
+        val schedules = dataAccess.findByTaxIdentifier(taxIdentifier)
+
+        assertEquals(1, schedules.size)
+        val schedule = schedules[0]
+        assertEquals("323e4567e89b12d3a456426614", schedule.id)
+        assertEquals(taxIdentifier, schedule.taxIdentifier)
+        assertEquals("[]", schedule.schedules)
+    }
+
+    @Test
+    fun `findByRootTaxIdentifier should return schedules for existing root CNPJ`() {
+        val rootTaxIdentifier = "12345678"
+        whenever(repository.findByRootTaxIdentifier(rootTaxIdentifier))
+            .thenReturn(testSchedules.filter { it.taxIdentifier.startsWith(rootTaxIdentifier) })
+
+        val schedules = dataAccess.findByRootTaxIdentifier(rootTaxIdentifier)
+
+        assertEquals(3, schedules.size)
+        val taxIdentifiers = schedules.map { it.taxIdentifier }.toSet()
+        assertEquals(setOf("12345678000195", "12345678000296", "12345678000397"), taxIdentifiers)
+    }
+
+    @Test
+    fun `findByRootTaxIdentifier should return empty list for non-existent root CNPJ`() {
+        val rootTaxIdentifier = "88888888"
+        whenever(repository.findByRootTaxIdentifier(rootTaxIdentifier))
+            .thenReturn(emptyList())
+
+        val schedules = dataAccess.findByRootTaxIdentifier(rootTaxIdentifier)
+
+        assertTrue(schedules.isEmpty())
+    }
+
+    @Test
+    fun `findByRootTaxIdentifier should throw IllegalArgumentException for invalid root CNPJ`() {
+        val invalidRootTaxIdentifier = "1234567"
+        val exception = assertThrows<IllegalArgumentException> {
+            dataAccess.findByRootTaxIdentifier(invalidRootTaxIdentifier)
+        }
+        assertEquals("Root tax identifier must be an 8-digit CNPJ root", exception.message)
+    }
+}
+```
+
+```kotlin
+package com.finapp.dataaccess
+
+import com.finapp.repository.CardReceivablesSchedule
+import com.finapp.repository.CardReceivablesScheduleRepository
+import org.springframework.stereotype.Component
 
 // Data Access Interface
 interface CardReceivablesScheduleDataAccess {
@@ -139,8 +315,39 @@ class CardReceivablesScheduleDataAccessImpl(
         return repository.findByRootTaxIdentifier(rootTaxIdentifier)
     }
 }
+```
 
-// For reference: Entity and Repository (unchanged from previous)
+```kotlin
+package com.finapp.dataaccess
+
+import com.finapp.repository.CardReceivablesSchedule
+import com.finapp.repository.CardReceivablesScheduleRepository
+import org.springframework.stereotype.Component
+
+// Data Access Interface
+interface CardReceivablesScheduleDataAccess {
+    fun findByTaxIdentifier(taxIdentifier: String): List<CardReceivablesSchedule>
+    fun findByRootTaxIdentifier(rootTaxIdentifier: String): List<CardReceivablesSchedule>
+}
+
+// Implementation
+@Component
+class CardReceivablesScheduleDataAccessImpl(
+    private val repository: CardReceivablesScheduleRepository
+) : CardReceivablesScheduleDataAccess {
+
+    override fun findByTaxIdentifier(taxIdentifier: String): List<CardReceivablesSchedule> {
+        require(taxIdentifier.matches(Regex("\\d{14}"))) { "Tax identifier must be a 14-digit CNPJ" }
+        return repository.findByTaxIdentifier(taxIdentifier)
+    }
+
+    override fun findByRootTaxIdentifier(rootTaxIdentifier: String): List<CardReceivablesSchedule> {
+        require(rootTaxIdentifier.matches(Regex("\\d{8}"))) { "Root tax identifier must be an 8-digit CNPJ root" }
+        return repository.findByRootTaxIdentifier(rootTaxIdentifier)
+    }
+}
+```
+```kotlin
 package com.finapp.repository
 
 import jakarta.persistence.*
@@ -150,6 +357,7 @@ import org.springframework.data.jpa.repository.Query
 import java.time.LocalDate
 import java.time.LocalDateTime
 
+// Entity
 @Entity
 @Table(name = "card_receivables_schedules")
 data class CardReceivablesSchedule(
@@ -186,9 +394,8 @@ data class CardReceivablesSchedule(
     val createdAt: LocalDateTime? = null
 )
 
-interface Card અ
-
-System: ReceivablesScheduleRepository : JpaRepository<CardReceivablesSchedule, String> {
+// Repository
+interface CardReceivablesScheduleRepository : JpaRepository<CardReceivablesSchedule, String> {
     
     @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier = :taxIdentifier")
     fun findByTaxIdentifier(taxIdentifier: String): List<CardReceivablesSchedule>
@@ -208,5 +415,30 @@ System: ReceivablesScheduleRepository : JpaRepository<CardReceivablesSchedule, S
     ): List<CardReceivablesSchedule>
 }
 ```
+
+```sql
+CREATE TABLE card_receivables_schedules (
+    id VARCHAR(26) NOT NULL,
+    tax_identifier VARCHAR(26) NOT NULL,
+    register VARCHAR(20) NOT NULL,
+    arrangement VARCHAR(3) NOT NULL,
+    accreditor VARCHAR(20) NOT NULL,
+    source VARCHAR(20) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    schedules JSONB NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE INDEX idx_tax_identifier ON card_receivables_schedules (tax_identifier);
+CREATE INDEX idx_tax_identifier_root ON card_receivables_schedules (SUBSTRING(tax_identifier, 1, 8));
+
+```
+
+
+
+
+
+
 
 
