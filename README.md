@@ -104,3 +104,76 @@ Minha experiência abrange a liderança técnica e a contribuição individual e
 * Busca contínua por aprimoramento em arquiteturas de sistemas distribuídos e escaláveis.
 
 Agradeço o seu interesse em meu perfil. Estou sempre aberto a novas oportunidades e desafios que me permitam aplicar e expandir minhas habilidades. 
+
+
+
+-- Insert test data for card_receivables_schedules
+INSERT INTO card_receivables_schedules (
+    id, tax_identifier, register, arrangement, accreditor, source, start_date, end_date, schedules, created_at
+) VALUES
+    -- Test case 1: Regular schedule with valid data
+    (
+        '123e4567-e89b-12d3-a456-426614174000',
+        '12345678000195',
+        'CERC',
+        'VIS',
+        'CIELO',
+        'ONLINE',
+        '2025-07-01',
+        '2025-07-31',
+        '[{"date": "2025-07-01", "amount": 1000.50}, {"date": "2025-07-15", "amount": 2000.75}]',
+        '2025-07-15 10:00:00'
+    ),
+    -- Test case 2: Same root CNPJ, different branch
+    (
+        '123e4567-e89b-12d3-a456-426614174001',
+        '12345678000296',
+        'NUCLEA',
+        'MAS',
+        'REDECARD',
+        'FILE',
+        '2025-07-01',
+        '2025-07-31',
+        '[{"date": "2025-07-02", "amount": 1500.25}]',
+        '2025-07-15 10:01:00'
+    ),
+    -- Test case 3: Different CNPJ, empty schedule (negative cache)
+    (
+        '123e4567-e89b-12d3-a456-426614174002',
+        '98765432000188',
+        'CERC',
+        'VIS',
+        'CIELO',
+        'ONLINE',
+        '2025-07-01',
+        '2025-07-31',
+        '[]',
+        '2025-07-15 10:02:00'
+    ),
+    -- Test case 4: Different arrangement, same CNPJ root
+    (
+        '123e4567-e89b-12d3-a456-426614174003',
+        '12345678000397',
+        'CERC',
+        'AME',
+        'GETNET',
+        'FILE',
+        '2025-07-01',
+        '2025-07-31',
+        '[{"date": "2025-07-03", "amount": 3000.00}]',
+        '2025-07-15 10:03:00'
+    ),
+    -- Test case 5: Different accreditor
+    (
+        '123e4567-e89b-12d3-a456-426614174004',
+        '45678912000177',
+        'NUCLEA',
+        'MAS',
+        'STONE',
+        'ONLINE',
+        '2025-07-01',
+        '2025-07-31',
+        '[{"date": "2025-07-04", "amount": 2500.30}, {"date": "2025-07-05", "amount": 1800.60}]',
+        '2025-07-15 10:04:00'
+    );
+
