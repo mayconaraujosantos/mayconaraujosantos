@@ -902,6 +902,32 @@ interface CardReceivablesScheduleRepository :
           @Param("endDate") endDate: LocalDate
   ): List<CardReceivablesScheduleTable>
 }
+package com.c6bak.finappguaranteecardreceivables.dataaccess
+
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
+import java.time.LocalDate
+import org.springframework.data.jpa.domain.Specification
+
+object CardReceivablesScheduleSpecs {
+  fun hasTaxIdentifier(taxIdentifier: String) =
+          Specification<CardReceivablesScheduleTable> { root, _, cb ->
+            cb.equal(root.get<String>("taxIdentifier"), taxIdentifier)
+          }
+  fun hasRootTaxIdentifier(rootTaxIdentifier: String) =
+          Specification<CardReceivablesScheduleTable> { root, _, cb ->
+            cb.like(root.get<String>("taxIdentifier"), "$rootTaxIdentifier%")
+          }
+  fun startDateAfterOrEqual(date: LocalDate) =
+          Specification<CardReceivablesScheduleTable> { root, _, cb ->
+            cb.greaterThanOrEqualTo(root.get("startDate"), date)
+          }
+  fun endDateBeforeOrEqual(date: LocalDate) =
+          Specification<CardReceivablesScheduleTable> { root, _, cb ->
+            cb.lessThanOrEqualTo(root.get("endDate"), date)
+          }
+}
+
+
 
 ```
 
