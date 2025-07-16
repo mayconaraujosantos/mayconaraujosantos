@@ -318,6 +318,41 @@ data class CardReceivableScheduleEntity(
 }
 ```
 
+```kotlin
+
+package com.finapp.guaranteecard.dataaccess
+
+import com.finapp.guaranteecard.domain.CardReceivableSchedule
+import java.time.LocalDate
+
+interface CustomCardReceivableScheduleRepository {
+    fun existsByCompositeKeyAndDateRange(
+        register: String,
+        arrangement: String,
+        accreditor: String,
+        source: CardReceivableSchedule.Source,
+        taxIdentifier: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Boolean
+
+    fun existsByTaxIdentifierAndDateRange(
+        taxIdentifier: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Boolean
+
+    fun existsByTaxIdentifierRootAndDateRange(
+        taxIdentifierRoot: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Boolean
+}
+
+```
+
+
+
 
 
 
