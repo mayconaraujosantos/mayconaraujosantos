@@ -840,6 +840,69 @@ class CardReceivablesScheduleDataAccessImplTest {
   }
 }
 
+package com.c6bak.finappguaranteecardreceivables.resources.repositories
+
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
+import java.time.LocalDate
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import org.springframework.stereotype.Repository
+
+@Repository
+interface CardReceivablesScheduleRepository :
+        JpaRepository<CardReceivablesScheduleTable, String>,
+        JpaSpecificationExecutor<CardReceivablesScheduleTable> {
+
+  // Get schedules pelo CNPJ inteiro
+  @Query("SELECT c FROM CardReceivablesScheduleTable c WHERE c.taxIdentifier = :taxIdentifier")
+  fun findByTaxIdentifier(
+          @Param("taxIdentifier") taxIdentifier: String
+  ): List<CardReceivablesScheduleTable>
+
+  // Get schedules pelo CNPJ inteiro + intervalo de datas
+  @Query(
+          """
+      SELECT c FROM CardReceivablesScheduleTable c
+      WHERE c.taxIdentifier = :taxIdentifier
+      AND c.startDate >= :startDate
+      AND c.endDate <= :endDate
+    """
+  )
+  fun findByTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+          @Param("taxIdentifier") taxIdentifier: String,
+          @Param("startDate") startDate: LocalDate,
+          @Param("endDate") endDate: LocalDate
+  ): List<CardReceivablesScheduleTable>
+
+  // Get schedules pelo CNPJ raiz (primeiros 9 dígitos) usando LIKE
+  @Query(
+          """
+      SELECT c FROM CardReceivablesScheduleTable c
+      WHERE c.taxIdentifier LIKE CONCAT(:rootTaxIdentifier, '%')
+    """
+  )
+  fun findByRootTaxIdentifier(
+          @Param("rootTaxIdentifier") rootTaxIdentifier: String
+  ): List<CardReceivablesScheduleTable>
+
+  // Get schedules pelo CNPJ raiz + intervalo de datas usando LIKE
+  @Query(
+          """
+      SELECT c FROM CardReceivablesScheduleTable c
+      WHERE c.taxIdentifier LIKE CONCAT(:rootTaxIdentifier, '%')
+      AND c.startDate >= :startDate
+      AND c.endDate <= :endDate
+    """
+  )
+  fun findByRootTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+          @Param("rootTaxIdentifier") rootTaxIdentifier: String,
+          @Param("startDate") startDate: LocalDate,
+          @Param("endDate") endDate: LocalDate
+  ): List<CardReceivablesScheduleTable>
+}
+
 ```
 
 
