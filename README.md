@@ -113,7 +113,7 @@ INSERT INTO card_receivables_schedules (
 ) VALUES
     -- Test case 1: Regular schedule with valid data
     (
-        '123e4567-e89b-12d3-a456-426614174000',
+        '123e4567e89b12d3a456426614',
         '12345678000195',
         'CERC',
         'VIS',
@@ -126,7 +126,7 @@ INSERT INTO card_receivables_schedules (
     ),
     -- Test case 2: Same root CNPJ, different branch
     (
-        '123e4567-e89b-12d3-a456-426614174001',
+        '223e4567e89b12d3a456426614',
         '12345678000296',
         'NUCLEA',
         'MAS',
@@ -139,7 +139,7 @@ INSERT INTO card_receivables_schedules (
     ),
     -- Test case 3: Different CNPJ, empty schedule (negative cache)
     (
-        '123e4567-e89b-12d3-a456-426614174002',
+        '323e4567e89b12d3a456426614',
         '98765432000188',
         'CERC',
         'VIS',
@@ -152,7 +152,7 @@ INSERT INTO card_receivables_schedules (
     ),
     -- Test case 4: Different arrangement, same CNPJ root
     (
-        '123e4567-e89b-12d3-a456-426614174003',
+        '423e4567e89b12d3a456426614',
         '12345678000397',
         'CERC',
         'AME',
@@ -165,7 +165,7 @@ INSERT INTO card_receivables_schedules (
     ),
     -- Test case 5: Different accreditor
     (
-        '123e4567-e89b-12d3-a456-426614174004',
+        '523e4567e89b12d3a456426614',
         '45678912000177',
         'NUCLEA',
         'MAS',
@@ -176,4 +176,3 @@ INSERT INTO card_receivables_schedules (
         '[{"date": "2025-07-04", "amount": 2500.30}, {"date": "2025-07-05", "amount": 1800.60}]',
         '2025-07-15 10:04:00'
     );
-
