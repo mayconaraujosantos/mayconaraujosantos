@@ -775,6 +775,407 @@ interface CardReceivablesScheduleRepository : JpaRepository<CardReceivablesSched
   ): List<CardReceivablesScheduleTable>
 }
 
+package com.c6bak.finappguaranteecardreceivables.domain.dataaccess
+
+// Importar explicitamente a implementação
+import com.c6bak.finappguaranteecardreceivables.dataaccess.CardReceivablesScheduleDataAccessImpl
+import com.c6bak.finappguaranteecardreceivables.domain.entities.CardReceivablesSchedule
+import com.c6bak.finappguaranteecardreceivables.domain.entities.Register
+import com.c6bak.finappguaranteecardreceivables.domain.entities.Source
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.CardReceivablesScheduleRepository
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import java.time.LocalDate
+import java.time.LocalDateTime
+import kotlin.test.assertEquals
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+
+class CardReceivablesScheduleDataAccessTest {
+  private lateinit var repository: CardReceivablesScheduleRepository
+  private lateinit var dataAccess: CardReceivablesScheduleDataAccessImpl
+
+  @BeforeEach
+  fun setUp() {
+    repository = mockk(relaxed = true)
+    dataAccess = CardReceivablesScheduleDataAccessImpl(repository)
+  }
+
+  private fun table(
+          id: String,
+          taxIdentifier: String,
+          register: Register = Register.CERC,
+          arrangement: String = "ARR",
+          accreditor: String = "ACC",
+          source: Source = Source.ONLINE,
+          startDate: LocalDate = LocalDate.of(2024, 1, 1),
+          endDate: LocalDate = LocalDate.of(2024, 1, 31),
+          schedules: String = "[]",
+          createdAt: LocalDateTime = LocalDateTime.now()
+  ) =
+          CardReceivablesScheduleTable(
+                  id = id,
+                  register = register.value,
+                  arrangement = arrangement,
+                  accreditor = accreditor,
+                  source = source.value,
+                  taxIdentifier = taxIdentifier,
+                  startDate = startDate,
+                  endDate = endDate,
+                  schedules = schedules,
+                  createdAt = createdAt
+          )
+
+  @Test
+  fun `should find by taxIdentifier and filter by date`() {
+    val tables =
+            listOf(
+                    table(
+                            "1",
+                            "123",
+                            startDate = LocalDate.of(2024, 1, 1),
+                            endDate = LocalDate.of(2024, 1, 31)
+                    ),
+                    table(
+                            "2",
+                            "123",
+                            startDate = LocalDate.of(2024, 2, 1),
+                            endDate = LocalDate.of(2024, 2, 28)
+                    )
+            )
+    every { repository.findByTaxIdentifier("123") } returns tables
+    val result =
+            dataAccess.findSchedulesByTaxIdentifier(
+                    "123",
+                    LocalDate.of(2024, 2, 1),
+                    LocalDate.of(2024, 2, 28)
+            )
+    assertEquals(1, result.size)
+    assertEquals("2", result[0].id)
+  }
+
+  @Test
+  fun `should find by rootTaxIdentifier and filter by date`() {
+    val tables =
+            listOf(
+                    table(
+                            "3",
+                            "98765432100",
+                            startDate = LocalDate.of(2024, 3, 1),
+                            endDate = LocalDate.of(2024, 3, 31)
+                    ),
+                    table(
+                            "4",
+                            "98765432199",
+                            startDate = LocalDate.of(2024, 4, 1),
+                            endDate = LocalDate.of(2024, 4, 30)
+                    )
+            )
+    every { repository.findByRootTaxIdentifier("987654321") } returns tables
+    val result =
+            dataAccess.findSchedulesByRootTaxIdentifier(
+                    "987654321",
+                    LocalDate.of(2024, 4, 1),
+                    LocalDate.of(2024, 4, 30)
+            )
+    assertEquals(1, result.size)
+    assertEquals("4", result[0].id)
+  }
+
+  @Test
+  fun `should find by composite key and filter by date`() {
+    val tables =
+            listOf(
+                    table(
+                            "5",
+                            "555",
+                            register = Register.NUCLEA,
+                            arrangement = "A",
+                            accreditor = "B",
+                            source = Source.FILE,
+                            startDate = LocalDate.of(2024, 5, 1),
+                            endDate = LocalDate.of(2024, 5, 31)
+                    ),
+                    table(
+                            "6",
+                            "555",
+                            register = Register.NUCLEA,
+                            arrangement = "A",
+                            accreditor = "B",
+                            source = Source.FILE,
+                            startDate = LocalDate.of(2024, 6, 1),
+                            endDate = LocalDate.of(2024, 6, 30)
+                    )
+            )
+    every {
+      repository.findByRegisterAndArrangementAndAccreditorAndSourceAndTaxIdentifier(
+              Register.NUCLEA.value,
+              "A",
+              "B",
+              Source.FILE.value,
+              "555"
+      )
+    } returns tables
+    val result =
+            dataAccess.findSchedulesByCompositeKey(
+                    Register.NUCLEA,
+                    "A",
+                    "B",
+                    Source.FILE,
+                    "555",
+                    LocalDate.of(2024, 6, 1),
+                    LocalDate.of(2024, 6, 30)
+            )
+    assertEquals(1, result.size)
+    assertEquals("6", result[0].id)
+  }
+
+  @Test
+  fun `should call saveSchedules correctly`() {
+    val schedule =
+            CardReceivablesSchedule(
+                    id = "10",
+                    taxIdentifier = "999",
+                    register = Register.CERC,
+                    arrangement = "ARR",
+                    accreditor = "ACC",
+                    source = Source.ONLINE,
+                    startDate = LocalDate.of(2024, 1, 1),
+                    endDate = LocalDate.of(2024, 1, 31),
+                    schedules = emptyList(),
+                    createdAt = LocalDateTime.now()
+            )
+    every { repository.saveAll(any<List<CardReceivablesScheduleTable>>()) } returns listOf()
+    dataAccess.saveSchedules(listOf(schedule))
+    verify(exactly = 1) { repository.saveAll(any<List<CardReceivablesScheduleTable>>()) }
+  }
+}
+package com.c6bak.finappguaranteecardreceivables.resources.repositories
+
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
+import java.time.LocalDate
+import java.time.LocalDateTime
+import kotlin.test.assertEquals
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
+import org.springframework.test.context.ActiveProfiles
+
+@DataJpaTest
+@ActiveProfiles("test")
+class CardReceivablesScheduleRepositoryTest
+@Autowired
+constructor(val repository: CardReceivablesScheduleRepository) {
+  private fun createSchedule(
+          id: String,
+          register: String,
+          arrangement: String,
+          accreditor: String,
+          source: String,
+          taxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate,
+          schedules: String = "[]",
+          createdAt: LocalDateTime = LocalDateTime.now()
+  ) =
+          CardReceivablesScheduleTable(
+                  id = id,
+                  register = register,
+                  arrangement = arrangement,
+                  accreditor = accreditor,
+                  source = source,
+                  taxIdentifier = taxIdentifier,
+                  startDate = startDate,
+                  endDate = endDate,
+                  schedules = schedules,
+                  createdAt = createdAt
+          )
+
+  @Test
+  fun `should find by taxIdentifier with and without date filter`() {
+    val schedule1 =
+            createSchedule(
+                    "1",
+                    "REG1",
+                    "ARR1",
+                    "ACC1",
+                    "SRC1",
+                    "12345678901",
+                    LocalDate.of(2024, 1, 1),
+                    LocalDate.of(2024, 1, 31)
+            )
+    val schedule2 =
+            createSchedule(
+                    "2",
+                    "REG1",
+                    "ARR1",
+                    "ACC1",
+                    "SRC1",
+                    "12345678901",
+                    LocalDate.of(2024, 2, 1),
+                    LocalDate.of(2024, 2, 28)
+            )
+    repository.saveAll(listOf(schedule1, schedule2))
+
+    val all = repository.findByTaxIdentifier("12345678901")
+    assertEquals(2, all.size)
+
+    val filtered =
+            repository.findByTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+                    "12345678901",
+                    LocalDate.of(2024, 2, 1),
+                    LocalDate.of(2024, 2, 28)
+            )
+    assertEquals(1, filtered.size)
+    assertEquals("2", filtered[0].id)
+  }
+
+  @Test
+  fun `should find by rootTaxIdentifier with and without date filter`() {
+    val schedule1 =
+            createSchedule(
+                    "3",
+                    "REG2",
+                    "ARR2",
+                    "ACC2",
+                    "SRC2",
+                    "98765432100",
+                    LocalDate.of(2024, 3, 1),
+                    LocalDate.of(2024, 3, 31)
+            )
+    val schedule2 =
+            createSchedule(
+                    "4",
+                    "REG2",
+                    "ARR2",
+                    "ACC2",
+                    "SRC2",
+                    "98765432199",
+                    LocalDate.of(2024, 4, 1),
+                    LocalDate.of(2024, 4, 30)
+            )
+    repository.saveAll(listOf(schedule1, schedule2))
+
+    val all = repository.findByRootTaxIdentifier("987654321")
+    assertEquals(2, all.size)
+
+    val filtered =
+            repository.findByRootTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+                    "987654321",
+                    LocalDate.of(2024, 4, 1),
+                    LocalDate.of(2024, 4, 30)
+            )
+    assertEquals(1, filtered.size)
+    assertEquals("4", filtered[0].id)
+  }
+
+  @Test
+  fun `should find by composite key with and without date filter`() {
+    val schedule1 =
+            createSchedule(
+                    "5",
+                    "REG3",
+                    "ARR3",
+                    "ACC3",
+                    "SRC3",
+                    "55555555555",
+                    LocalDate.of(2024, 5, 1),
+                    LocalDate.of(2024, 5, 31)
+            )
+    val schedule2 =
+            createSchedule(
+                    "6",
+                    "REG3",
+                    "ARR3",
+                    "ACC3",
+                    "SRC3",
+                    "55555555555",
+                    LocalDate.of(2024, 6, 1),
+                    LocalDate.of(2024, 6, 30)
+            )
+    repository.saveAll(listOf(schedule1, schedule2))
+
+    val all =
+            repository.findByRegisterAndArrangementAndAccreditorAndSourceAndTaxIdentifier(
+                    "REG3",
+                    "ARR3",
+                    "ACC3",
+                    "SRC3",
+                    "55555555555"
+            )
+    assertEquals(2, all.size)
+
+    val filtered =
+            repository
+                    .findByRegisterAndArrangementAndAccreditorAndSourceAndTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+                            "REG3",
+                            "ARR3",
+                            "ACC3",
+                            "SRC3",
+                            "55555555555",
+                            LocalDate.of(2024, 6, 1),
+                            LocalDate.of(2024, 6, 30)
+                    )
+    assertEquals(1, filtered.size)
+    assertEquals("6", filtered[0].id)
+  }
+
+  @Test
+  fun `should find by composite key and rootTaxIdentifier with and without date filter`() {
+    val schedule1 =
+            createSchedule(
+                    "7",
+                    "REG4",
+                    "ARR4",
+                    "ACC4",
+                    "SRC4",
+                    "11111111100",
+                    LocalDate.of(2024, 7, 1),
+                    LocalDate.of(2024, 7, 31)
+            )
+    val schedule2 =
+            createSchedule(
+                    "8",
+                    "REG4",
+                    "ARR4",
+                    "ACC4",
+                    "SRC4",
+                    "11111111199",
+                    LocalDate.of(2024, 8, 1),
+                    LocalDate.of(2024, 8, 31)
+            )
+    repository.saveAll(listOf(schedule1, schedule2))
+
+    val all =
+            repository.findByCompositeKeyAndRootTaxIdentifier(
+                    "REG4",
+                    "ARR4",
+                    "ACC4",
+                    "SRC4",
+                    "111111111"
+            )
+    assertEquals(2, all.size)
+
+    val filtered =
+            repository
+                    .findByCompositeKeyAndRootTaxIdentifierAndStartDateGreaterThanEqualAndEndDateLessThanEqual(
+                            "REG4",
+                            "ARR4",
+                            "ACC4",
+                            "SRC4",
+                            "111111111",
+                            LocalDate.of(2024, 8, 1),
+                            LocalDate.of(2024, 8, 31)
+                    )
+    assertEquals(1, filtered.size)
+    assertEquals("8", filtered[0].id)
+  }
+}
+
+
+
 ```
 
 
