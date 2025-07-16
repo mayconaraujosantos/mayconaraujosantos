@@ -106,6 +106,120 @@ Minha experiência abrange a liderança técnica e a contribuição individual e
 Agradeço o seu interesse em meu perfil. Estou sempre aberto a novas oportunidades e desafios que me permitam aplicar e expandir minhas habilidades. 
 
 
+```sql
+CREATE TABLE card_receivables_schedules (
+    id VARCHAR(26) NOT NULL PRIMARY KEY,
+    register VARCHAR(20) NOT NULL,
+    arrangement VARCHAR(3) NOT NULL,
+    accreditor VARCHAR(20) NOT NULL,
+    source VARCHAR(20) NOT NULL,
+    tax_identifier VARCHAR(26) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    schedules JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_card_receivables_schedules_main ON card_receivables_schedules (
+    register,
+    arrangement,
+    accreditor,
+    source,
+    tax_identifier
+);
+
+CREATE INDEX idx_card_receivables_schedules_tax_identifier ON card_receivables_schedules (tax_identifier);
+
+CREATE INDEX idx_card_receivables_schedules_tax_identifier_root ON card_receivables_schedules (LEFT(tax_identifier::text, 8));
+
+CREATE INDEX idx_card_receivables_schedules_empty_cache ON card_receivables_schedules ((schedules::text = '[]'));
+```
+
+```kotlin
+package com.finapp.guaranteecard.dataaccess.impl
+
+import com.finapp.guaranteecard.dataaccess.CustomCardReceivableScheduleRepository
+import com.finapp.guaranteecard.domain.CardReceivableSchedule
+import jakarta.persistence.EntityManager
+import jakarta.persistence.PersistenceContext
+import java.time.LocalDate
+
+class CardReceivableScheduleRepositoryImpl : CustomCardReceivableScheduleRepository {
+
+    @PersistenceContext
+    private lateinit var entityManager: EntityManager
+
+    override fun existsByCompositeKeyAndDateRange(
+        register: String,
+        arrangement: String,
+        accreditor: String,
+        source: CardReceivableSchedule.Source,
+        taxIdentifier: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Boolean {
+        val query = entityManager.createQuery("""
+            SELECT COUNT(e) > 0 FROM CardReceivableScheduleEntity e 
+            WHERE e.register = :register 
+            AND e.arrangement = :arrangement 
+            AND e.accreditor = :accreditor 
+            AND e.source = :source 
+            AND e.taxIdentifier = :taxIdentifier
+            AND e.startDate <= :endDate 
+            AND e.endDate >= :startDate
+        """, Boolean::class.java)
+
+        query.setParameter("register", register)
+        query.setParameter("arrangement", arrangement)
+        query.setParameter("accreditor", accreditor)
+        query.setParameter("source", source)
+        query.setParameter("taxIdentifier", taxIdentifier)
+        query.setParameter("startDate", startDate)
+        query.setParameter("endDate", endDate)
+
+        return query.singleResult
+    }
+
+    override fun existsByTaxIdentifierAndDateRange(
+        taxIdentifier: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Boolean {
+        val query = entityManager.createQuery("""
+            SELECT COUNT(e) > 0 FROM CardReceivableScheduleEntity e 
+            WHERE e.taxIdentifier = :taxIdentifier
+            AND e.startDate <= :endDate 
+            AND e.endDate >= :startDate
+        """, Boolean::class.java)
+
+        query.setParameter("taxIdentifier", taxIdentifier)
+        query.setParameter("startDate", startDate)
+        query.setParameter("endDate", endDate)
+
+        return query.singleResult
+    }
+
+    override fun existsByTaxIdentifierRootAndDateRange(
+        taxIdentifierRoot: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Boolean {
+        val query = entityManager.createNativeQuery("""
+            SELECT COUNT(e) > 0 FROM card_receivables_schedules e 
+            WHERE SUBSTRING(e.tax_identifier, 1, 8) = :taxIdentifierRoot
+            AND e.start_date <= :endDate 
+            AND e.end_date >= :startDate
+        """)
+
+        query.setParameter("taxIdentifierRoot", taxIdentifierRoot)
+        query.setParameter("startDate", startDate)
+        query.setParameter("endDate", endDate)
+
+        return query.singleResult as Boolean
+    }
+}
+```
+
 
 
 
