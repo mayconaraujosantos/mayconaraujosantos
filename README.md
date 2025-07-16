@@ -108,181 +108,92 @@ Agradeço o seu interesse em meu perfil. Estou sempre aberto a novas oportunidad
 
 
 ```kotlin
-package com.finapp.dataaccess
+package com.finapp.repository
 
-import com.finapp.repository.CardReceivablesSchedule
-import com.finapp.repository.CardReceivablesScheduleRepository
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.InjectMocks
-import org.mockito.Mock
-import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.whenever
+import jakarta.persistence.*
+import org.hibernate.annotations.CreationTimestamp
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
 import java.time.LocalDate
 import java.time.LocalDateTime
-import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.assertThrows
 
-@ExtendWith(MockitoExtension::class)
-class CardReceivablesScheduleDataAccessTest {
+// Entity
+@Entity
+@Table(name = "card_receivables_schedules")
+data class CardReceivablesSchedule(
+    @Id
+    @Column(length = 26)
+    val id: String,
 
-    @Mock
-    private lateinit var repository: CardReceivablesScheduleRepository
+    @Column(name = "tax_identifier", length = 26, nullable = false)
+    val taxIdentifier: String,
 
-    @InjectMocks
-    private lateinit var dataAccess: CardReceivablesScheduleDataAccessImpl
+    @Column(length = 20, nullable = false)
+    val register: String,
 
-    private val testSchedules = listOf(
-        CardReceivablesSchedule(
-            id = "123e4567e89b12d3a456426614",
-            taxIdentifier = "12345678000195",
-            register = "CERC",
-            arrangement = "VIS",
-            accreditor = "CIELO",
-            source = "ONLINE",
-            startDate = LocalDate.of(2025, 7, 1),
-            endDate = LocalDate.of(2025, 7, 31),
-            schedules = """[{"date": "2025-07-01", "amount": 1000.50}, {"date": "2025-07-15", "amount": 2000.75}]""",
-            createdAt = LocalDateTime.of(2025, 7, 15, 10, 0, 0)
-        ),
-        CardReceivablesSchedule(
-            id = "223e4567e89b12d3a456426614",
-            taxIdentifier = "12345678000296",
-            register = "NUCLEA",
-            arrangement = "MAS",
-            accreditor = "REDECARD",
-            source = "FILE",
-            startDate = LocalDate.of(2025, 7, 1),
-            endDate = LocalDate.of(2025, 7, 31),
-            schedules = """[{"date": "2025-07-02", "amount": 1500.25}]""",
-            createdAt = LocalDateTime.of(2025, 7, 15, 10, 1, 0)
-        ),
-        CardReceivablesSchedule(
-            id = "323e4567e89b12d3a456426614",
-            taxIdentifier = "98765432000188",
-            register = "CERC",
-            arrangement = "VIS",
-            accreditor = "CIELO",
-            source = "ONLINE",
-            startDate = LocalDate.of(2025, 7, 1),
-            endDate = LocalDate.of(2025, 7, 31),
-            schedules = "[]",
-            createdAt = LocalDateTime.of(2025, 7, 15, 10, 2, 0)
-        ),
-        CardReceivablesSchedule(
-            id = "423e4567e89b12d3a456426614",
-            taxIdentifier = "12345678000397",
-            register = "C彼此
+    @Column(length = 3, nullable = false)
+    val arrangement: String,
 
-System: "CERC",
-            arrangement = "AME",
-            accreditor = "GETNET",
-            source = "FILE",
-            startDate = LocalDate.of(2025, 7, 1),
-            endDate = LocalDate.of(2025, 7, 31),
-            schedules = """[{"date": "2025-07-03", "amount": 3000.00}]""",
-            createdAt = LocalDateTime.of(2025, 7, 15, 10, 3, 0)
-        ),
-        CardReceivablesSchedule(
-            id = "523e4567e89b12d3a456426614",
-            taxIdentifier = "45678912000177",
-            register = "NULEA",
-            arrangement = "MAS",
-            accreditor = "STONE",
-            source = "ONLINE",
-            startDate = LocalDate.of(2025, 7, 1),
-            endDate = LocalDate.of(2025, 7, 31),
-            schedules = """[{"date": "2025-07-04", "amount": 2500.30}, {"date": "2025-07-05", "amount": 1800.60}]""",
-            createdAt = LocalDateTime.of(2025, 7, 15, 10, 4, 0)
-        )
-    )
+    @Column(length = 20, nullable = false)
+    val accreditor: String,
 
-    @Test
-    fun `findByTaxIdentifier should return schedule for existing CNPJ`() {
-        val taxIdentifier = "12345678000195"
-        whenever(repository.findByTaxIdentifier(taxIdentifier))
-            .thenReturn(testSchedules.filter { it.taxIdentifier == taxIdentifier })
+    @Column(length = 20, nullable = false)
+    val source: String,
 
-        val schedules = dataAccess.findByTaxIdentifier(taxIdentifier)
+    @Column(name = "start_date", nullable = false)
+    val startDate: LocalDate,
 
-        assertEquals(1, schedules.size)
-        val schedule = schedules[0]
-        assertEquals("123e4567e89b12d3a456426614", schedule.id)
-        assertEquals(taxIdentifier, schedule.taxIdentifier)
-        assertEquals("CERC", schedule.register)
-        assertEquals("VIS", schedule.arrangement)
-        assertEquals("CIELO", schedule.accreditor)
-        assertEquals("ONLINE", schedule.source)
-        assertEquals("""[{"date": "2025-07-01", "amount": 1000.50}, {"date": "2025-07-15", "amount": 2000.75}]""", schedule.schedules)
-    }
+    @Column(name = "end_date", nullable = false)
+    val endDate: LocalDate,
 
-    @Test
-    fun `findByTaxIdentifier should return empty list for non-existent CNPJ`() {
-        val taxIdentifier = "99999999000199"
-        whenever(repository.findByTaxIdentifier(taxIdentifier))
-            .thenReturn(emptyList())
+    @Column(columnDefinition = "jsonb", nullable = false)
+    val schedules: String,
 
-        val schedules = dataAccess.findByTaxIdentifier(taxIdentifier)
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false)
+    val createdAt: LocalDateTime? = null
+)
 
-        assertTrue(schedules.isEmpty())
-    }
+// Repository
+interface CardReceivablesScheduleRepository : JpaRepository<CardReceivablesSchedule, String> {
+    
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier = :taxIdentifier " +
+           "AND c.startDate <= :endDate AND c.endDate >= :startDate")
+    fun findByTaxIdentifierAndDateOverlap(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
 
-    @Test
-    fun `findByTaxIdentifier should throw IllegalArgumentException for invalid CNPJ`() {
-        val invalidTaxIdentifier = "123456789"
-        val exception = assertThrows<IllegalArgumentException> {
-            dataAccess.findByTaxIdentifier(invalidTaxIdentifier)
-        }
-        assertEquals("Tax identifier must be a 14-digit CNPJ", exception.message)
-    }
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier = :taxIdentifier " +
+           "AND c.startDate BETWEEN :startDate AND :endDate")
+    fun findByTaxIdentifierAndStartDateBetween(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
 
-    @Test
-    fun `findByTaxIdentifier should return empty schedules for negative cache case`() {
-        val taxIdentifier = "98765432000188"
-        whenever(repository.findByTaxIdentifier(taxIdentifier))
-            .thenReturn(testSchedules.filter { it.taxIdentifier == taxIdentifier })
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier = :taxIdentifier " +
+           "AND c.endDate BETWEEN :startDate AND :endDate")
+    fun findByTaxIdentifierAndEndDateBetween(taxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
+    
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier LIKE :rootTaxIdentifier || '%' " +
+           "AND c.startDate <= :endDate AND c.endDate >= :startDate")
+    fun findByRootTaxIdentifierAndDateOverlap(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
+    
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier LIKE :rootTaxIdentifier || '%' " +
+           "AND c.startDate BETWEEN :startDate AND :endDate")
+    fun findByRootTaxIdentifierAndStartDateBetween(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
 
-        val schedules = dataAccess.findByTaxIdentifier(taxIdentifier)
-
-        assertEquals(1, schedules.size)
-        val schedule = schedules[0]
-        assertEquals("323e4567e89b12d3a456426614", schedule.id)
-        assertEquals(taxIdentifier, schedule.taxIdentifier)
-        assertEquals("[]", schedule.schedules)
-    }
-
-    @Test
-    fun `findByRootTaxIdentifier should return schedules for existing root CNPJ`() {
-        val rootTaxIdentifier = "12345678"
-        whenever(repository.findByRootTaxIdentifier(rootTaxIdentifier))
-            .thenReturn(testSchedules.filter { it.taxIdentifier.startsWith(rootTaxIdentifier) })
-
-        val schedules = dataAccess.findByRootTaxIdentifier(rootTaxIdentifier)
-
-        assertEquals(3, schedules.size)
-        val taxIdentifiers = schedules.map { it.taxIdentifier }.toSet()
-        assertEquals(setOf("12345678000195", "12345678000296", "12345678000397"), taxIdentifiers)
-    }
-
-    @Test
-    fun `findByRootTaxIdentifier should return empty list for non-existent root CNPJ`() {
-        val rootTaxIdentifier = "88888888"
-        whenever(repository.findByRootTaxIdentifier(rootTaxIdentifier))
-            .thenReturn(emptyList())
-
-        val schedules = dataAccess.findByRootTaxIdentifier(rootTaxIdentifier)
-
-        assertTrue(schedules.isEmpty())
-    }
-
-    @Test
-    fun `findByRootTaxIdentifier should throw IllegalArgumentException for invalid root CNPJ`() {
-        val invalidRootTaxIdentifier = "1234567"
-        val exception = assertThrows<IllegalArgumentException> {
-            dataAccess.findByRootTaxIdentifier(invalidRootTaxIdentifier)
-        }
-        assertEquals("Root tax identifier must be an 8-digit CNPJ root", exception.message)
-    }
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier LIKE :rootTaxIdentifier || '%' " +
+           "AND c.endDate BETWEEN :startDate AND :endDate")
+    fun findByRootTaxIdentifierAndEndDateBetween(rootTaxIdentifier: String, startDate: LocalDate, endDate: LocalDate): List<CardReceivablesSchedule>
+    
+    @Query("SELECT c FROM CardReceivablesSchedule c WHERE c.taxIdentifier = :taxIdentifier " +
+           "AND c.register = :register AND c.arrangement = :arrangement " +
+           "AND c.accreditor = :accreditor AND c.source = :source " +
+           "AND c.startDate <= :endDate AND c.endDate >= :startDate")
+    fun findByCompositeKeyAndDateOverlap(
+        taxIdentifier: String,
+        register: String,
+        arrangement: String,
+        accreditor: String,
+        source: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): List<CardReceivablesSchedule>
 }
 ```
 
