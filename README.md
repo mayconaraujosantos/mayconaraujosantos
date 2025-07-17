@@ -471,4 +471,265 @@ class CardReceivablesScheduleFiltersTest {
 
 
 ```
+```kotlin
+package com.c6bak.finappguaranteecardreceivables.domain.dataaccess
+
+import com.c6bak.finappguaranteecardreceivables.dataaccess.CardReceivablesScheduleDataAccessImpl
+import com.c6bak.finappguaranteecardreceivables.domain.entities.CardReceivableScheduleItem
+import com.c6bak.finappguaranteecardreceivables.domain.entities.enums.Register
+import com.c6bak.finappguaranteecardreceivables.domain.entities.enums.Source
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.CardReceivablesScheduleRepository
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
+import com.c6bak.finappguaranteecardreceivables.test.utils.CardReceivablesScheduleBuilder
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
+import jakarta.persistence.criteria.CriteriaBuilder
+import jakarta.persistence.criteria.CriteriaQuery
+import jakarta.persistence.criteria.Root
+import java.time.LocalDate
+import java.time.LocalDateTime
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.springframework.data.jpa.domain.Specification
+
+class CardReceivablesScheduleDataAccessImplTest {
+  private lateinit var repository: CardReceivablesScheduleRepository
+  private lateinit var dataAccess: CardReceivablesScheduleDataAccessImpl
+
+  companion object {
+    const val DEFAULT_ID = "1"
+    const val DEFAULT_TAX_IDENTIFIER = "12345678901234"
+    const val DEFAULT_REGISTER = "CERC"
+    const val DEFAULT_ARRANGEMENT = "ARR"
+    const val DEFAULT_ACCREDITOR = "ACC"
+    const val DEFAULT_SOURCE = "ONLINE"
+    val DEFAULT_START_DATE: LocalDate = LocalDate.of(2024, 1, 1)
+    val DEFAULT_END_DATE: LocalDate = LocalDate.of(2024, 1, 31)
+    val DEFAULT_CREATED_AT: LocalDateTime = LocalDateTime.of(2024, 1, 1, 0, 0)
+  }
+
+  @BeforeEach
+  fun setUp() {
+    repository = mockk(relaxed = true)
+    dataAccess = CardReceivablesScheduleDataAccessImpl(repository)
+  }
+
+  private fun buildTableEntity(
+          id: String = DEFAULT_ID,
+          taxIdentifier: String = DEFAULT_TAX_IDENTIFIER,
+          register: Register = Register.CERC,
+          arrangement: String = DEFAULT_ARRANGEMENT,
+          accreditor: String = DEFAULT_ACCREDITOR,
+          source: Source = Source.ONLINE,
+          startDate: LocalDate = DEFAULT_START_DATE,
+          endDate: LocalDate = DEFAULT_END_DATE,
+          schedules: List<CardReceivableScheduleItem> = emptyList(),
+          createdAt: LocalDateTime = DEFAULT_CREATED_AT
+  ) =
+          CardReceivablesScheduleTable(
+                  id = id,
+                  register = register.value,
+                  arrangement = arrangement,
+                  accreditor = accreditor,
+                  source = source.value,
+                  taxIdentifier = taxIdentifier,
+                  startDate = startDate,
+                  endDate = endDate,
+                  schedules = schedules,
+                  createdAt = createdAt
+          )
+
+  @Test
+  fun `should find schedules by taxIdentifier with date filter`() {
+    val startDate = LocalDate.of(2024, 2, 1)
+    val endDate = LocalDate.of(2024, 2, 28)
+    val tableEntities =
+            listOf(
+                    buildTableEntity(
+                            id = "1",
+                            startDate = LocalDate.of(2024, 1, 1),
+                            endDate = LocalDate.of(2024, 1, 31)
+                    ),
+                    buildTableEntity(id = "2", startDate = startDate, endDate = endDate),
+                    buildTableEntity(
+                            id = "3",
+                            startDate = LocalDate.of(2024, 3, 1),
+                            endDate = LocalDate.of(2024, 3, 31)
+                    )
+            )
+    val specSlot = slot<Specification<CardReceivablesScheduleTable>>()
+    every { repository.findAll(capture(specSlot)) } returns tableEntities
+    val result = dataAccess.findSchedulesByTaxIdentifier(DEFAULT_TAX_IDENTIFIER, startDate, endDate)
+    assertEquals(3, result.size)
+    verify(exactly = 1) { repository.findAll(any<Specification<CardReceivablesScheduleTable>>()) }
+    assertTrue(specSlot.isCaptured)
+    val spec = specSlot.captured
+    val root = mockk<Root<CardReceivablesScheduleTable>>(relaxed = true)
+    val query = mockk<CriteriaQuery<*>>(relaxed = true)
+    val cb = mockk<CriteriaBuilder>(relaxed = true)
+    spec.toPredicate(root, query, cb)
+    verify { cb.equal(root.get<String>("taxIdentifier"), DEFAULT_TAX_IDENTIFIER) }
+    verify { cb.greaterThanOrEqualTo(root.get<LocalDate>("startDate"), startDate) }
+    verify { cb.lessThanOrEqualTo(root.get<LocalDate>("endDate"), endDate) }
+  }
+
+  @Test
+  fun `should find schedules by rootTaxIdentifier with date filter`() {
+    val rootTaxIdentifier = "123456789"
+    val startDate = LocalDate.of(2024, 4, 1)
+    val endDate = LocalDate.of(2024, 4, 30)
+    val tableEntities =
+            listOf(
+                    buildTableEntity(
+                            id = "4",
+                            taxIdentifier = "12345678901234",
+                            startDate = startDate,
+                            endDate = LocalDate.of(2024, 4, 15)
+                    ),
+                    buildTableEntity(
+                            id = "5",
+                            taxIdentifier = "12345678998765",
+                            startDate = LocalDate.of(2024, 4, 10),
+                            endDate = endDate
+                    ),
+                    buildTableEntity(
+                            id = "6",
+                            taxIdentifier = "98765432101234",
+                            startDate = startDate,
+                            endDate = endDate
+                    )
+            )
+    every { repository.findAll(any<Specification<CardReceivablesScheduleTable>>()) } returns
+            tableEntities.filter { it.taxIdentifier.startsWith(rootTaxIdentifier) }
+    val result = dataAccess.findSchedulesByRootTaxIdentifier(rootTaxIdentifier, startDate, endDate)
+    assertEquals(2, result.size)
+    assertTrue(result.all { it.taxIdentifier.startsWith(rootTaxIdentifier) })
+    verify(exactly = 1) { repository.findAll(any<Specification<CardReceivablesScheduleTable>>()) }
+  }
+
+  @Test
+  fun `should save schedules correctly`() {
+    val schedules =
+            listOf(
+                    CardReceivablesScheduleBuilder()
+                            .id("10")
+                            .taxIdentifier("99999999999999")
+                            .build()
+            )
+    every { repository.saveAll(any<List<CardReceivablesScheduleTable>>()) } returns listOf()
+    dataAccess.saveSchedules(schedules)
+    verify(exactly = 1) { repository.saveAll(any<List<CardReceivablesScheduleTable>>()) }
+  }
+
+  @Test
+  fun `should apply correct filters when finding by taxIdentifier`() {
+    val startDate = DEFAULT_START_DATE
+    val endDate = DEFAULT_END_DATE
+    val specSlot = slot<Specification<CardReceivablesScheduleTable>>()
+    every { repository.findAll(capture(specSlot)) } returns emptyList()
+    dataAccess.findSchedulesByTaxIdentifier(DEFAULT_TAX_IDENTIFIER, startDate, endDate)
+    verify(exactly = 1) { repository.findAll(any<Specification<CardReceivablesScheduleTable>>()) }
+    assertTrue(specSlot.isCaptured)
+    val spec = specSlot.captured
+    val root = mockk<Root<CardReceivablesScheduleTable>>(relaxed = true)
+    val query = mockk<CriteriaQuery<*>>(relaxed = true)
+    val cb = mockk<CriteriaBuilder>(relaxed = true)
+    spec.toPredicate(root, query, cb)
+    verify { cb.equal(root.get<String>("taxIdentifier"), DEFAULT_TAX_IDENTIFIER) }
+    verify { cb.greaterThanOrEqualTo(root.get<LocalDate>("startDate"), startDate) }
+    verify { cb.lessThanOrEqualTo(root.get<LocalDate>("endDate"), endDate) }
+  }
+
+  @Test
+  fun `should apply correct filters when finding by rootTaxIdentifier`() {
+    val rootTaxIdentifier = "123456789"
+    val startDate = DEFAULT_START_DATE
+    val endDate = DEFAULT_END_DATE
+    val specSlot = slot<Specification<CardReceivablesScheduleTable>>()
+    every { repository.findAll(capture(specSlot)) } returns emptyList()
+    dataAccess.findSchedulesByRootTaxIdentifier(rootTaxIdentifier, startDate, endDate)
+    verify(exactly = 1) { repository.findAll(any<Specification<CardReceivablesScheduleTable>>()) }
+    assertTrue(specSlot.isCaptured)
+  }
+
+  @Test
+  fun `should find schedules by composite key`() {
+    val register = Register.CERC.value
+    val arrangement = DEFAULT_ARRANGEMENT
+    val accreditor = DEFAULT_ACCREDITOR
+    val source = Source.ONLINE.value
+    val taxIdentifier = DEFAULT_TAX_IDENTIFIER
+    val matchingEntity =
+            buildTableEntity(
+                    id = "1",
+                    taxIdentifier = taxIdentifier,
+                    register = Register.CERC,
+                    arrangement = arrangement,
+                    accreditor = accreditor,
+                    source = Source.ONLINE
+            )
+    every { repository.findAll(any<Specification<CardReceivablesScheduleTable>>()) } returns
+            listOf(matchingEntity)
+    val result =
+            dataAccess.findByCompositeKey(register, arrangement, accreditor, source, taxIdentifier)
+    assertEquals(1, result.size)
+    assertEquals(taxIdentifier, result[0].taxIdentifier)
+    assertEquals(register, result[0].register)
+    assertEquals(arrangement, result[0].arrangement)
+    assertEquals(accreditor, result[0].accreditor)
+    assertEquals(source, result[0].source)
+    verify(exactly = 1) { repository.findAll(any<Specification<CardReceivablesScheduleTable>>()) }
+  }
+}
+package com.c6bak.finappguaranteecardreceivables.test.utils
+
+import com.c6bak.finappguaranteecardreceivables.domain.entities.CardReceivableScheduleItem
+import com.c6bak.finappguaranteecardreceivables.domain.entities.CardReceivablesSchedule
+import java.time.LocalDate
+import java.time.LocalDateTime
+
+class CardReceivablesScheduleBuilder {
+  private var id: String = "1"
+  private var taxIdentifier: String = "12345678901234"
+  private var register: String = "CERC"
+  private var arrangement: String = "ARR"
+  private var accreditor: String = "ACC"
+  private var source: String = "ONLINE"
+  private var startDate: LocalDate = LocalDate.of(2024, 1, 1)
+  private var endDate: LocalDate = LocalDate.of(2024, 1, 31)
+  private var schedules: List<CardReceivableScheduleItem> = emptyList()
+  private var createdAt: LocalDateTime = LocalDateTime.of(2024, 1, 1, 0, 0)
+
+  fun id(id: String) = apply { this.id = id }
+  fun taxIdentifier(taxIdentifier: String) = apply { this.taxIdentifier = taxIdentifier }
+  fun register(register: String) = apply { this.register = register }
+  fun arrangement(arrangement: String) = apply { this.arrangement = arrangement }
+  fun accreditor(accreditor: String) = apply { this.accreditor = accreditor }
+  fun source(source: String) = apply { this.source = source }
+  fun startDate(startDate: LocalDate) = apply { this.startDate = startDate }
+  fun endDate(endDate: LocalDate) = apply { this.endDate = endDate }
+  fun schedules(schedules: List<CardReceivableScheduleItem>) = apply { this.schedules = schedules }
+  fun createdAt(createdAt: LocalDateTime) = apply { this.createdAt = createdAt }
+
+  fun build() =
+          CardReceivablesSchedule(
+                  id = id,
+                  taxIdentifier = taxIdentifier,
+                  register = register,
+                  arrangement = arrangement,
+                  accreditor = accreditor,
+                  source = source,
+                  startDate = startDate,
+                  endDate = endDate,
+                  schedules = schedules,
+                  createdAt = createdAt
+          )
+}
+
+
+```
 
