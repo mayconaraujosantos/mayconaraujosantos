@@ -188,7 +188,10 @@ class CardReceivablesScheduleFiltersTest {
     val query = mockk<CriteriaQuery<*>>(relaxed = true)
     val cb = mockk<CriteriaBuilder>(relaxed = true)
     val taxIdentifier = "12345678901234"
-    CardReceivablesScheduleFilters.byTaxIdentifier(taxIdentifier).toPredicate(root, query, cb)
+    val predicate =
+            CardReceivablesScheduleFilters.byTaxIdentifier(taxIdentifier)
+                    .toPredicate(root, query, cb)
+    assertNotNull(predicate, "Predicate should not be null")
     verify { cb.equal(root.get<String>("taxIdentifier"), taxIdentifier) }
   }
 
@@ -198,7 +201,8 @@ class CardReceivablesScheduleFiltersTest {
     val query = mockk<CriteriaQuery<*>>(relaxed = true)
     val cb = mockk<CriteriaBuilder>(relaxed = true)
     val date = LocalDate.of(2024, 1, 1)
-    CardReceivablesScheduleFilters.fromStartDate(date).toPredicate(root, query, cb)
+    val predicate = CardReceivablesScheduleFilters.fromStartDate(date).toPredicate(root, query, cb)
+    assertNotNull(predicate, "Predicate should not be null")
     verify { cb.greaterThanOrEqualTo(root.get<LocalDate>("startDate"), date) }
   }
 
@@ -208,7 +212,8 @@ class CardReceivablesScheduleFiltersTest {
     val query = mockk<CriteriaQuery<*>>(relaxed = true)
     val cb = mockk<CriteriaBuilder>(relaxed = true)
     val date = LocalDate.of(2024, 2, 28)
-    CardReceivablesScheduleFilters.untilEndDate(date).toPredicate(root, query, cb)
+    val predicate = CardReceivablesScheduleFilters.untilEndDate(date).toPredicate(root, query, cb)
+    assertNotNull(predicate, "Predicate should not be null")
     verify { cb.lessThanOrEqualTo(root.get<LocalDate>("endDate"), date) }
   }
 
@@ -218,8 +223,10 @@ class CardReceivablesScheduleFiltersTest {
     val query = mockk<CriteriaQuery<*>>(relaxed = true)
     val cb = mockk<CriteriaBuilder>(relaxed = true)
     val rootTaxIdentifier = "123456789"
-    CardReceivablesScheduleFilters.byRootTaxIdentifier(rootTaxIdentifier)
-            .toPredicate(root, query, cb)
+    val predicate =
+            CardReceivablesScheduleFilters.byRootTaxIdentifier(rootTaxIdentifier)
+                    .toPredicate(root, query, cb)
+    assertNotNull(predicate, "Predicate should not be null")
     verify { cb.like(root.get<String>("taxIdentifier"), "$rootTaxIdentifier%") }
   }
 
@@ -235,7 +242,8 @@ class CardReceivablesScheduleFiltersTest {
             CardReceivablesScheduleFilters.byTaxIdentifier(taxIdentifier)
                     .and(CardReceivablesScheduleFilters.fromStartDate(date))
                     .and(CardReceivablesScheduleFilters.untilEndDate(endDate))
-    spec.toPredicate(root, query, cb)
+    val predicate = spec.toPredicate(root, query, cb)
+    assertNotNull(predicate, "Predicate should not be null")
     verify { cb.equal(root.get<String>("taxIdentifier"), taxIdentifier) }
     verify { cb.greaterThanOrEqualTo(root.get<LocalDate>("startDate"), date) }
     verify { cb.lessThanOrEqualTo(root.get<LocalDate>("endDate"), endDate) }
@@ -292,6 +300,7 @@ class CardReceivablesScheduleFiltersTest {
     assertNotNull(endDateFilter)
   }
 }
+
 package com.c6bak.finappguaranteecardreceivables.domain.dataaccess
 
 import com.c6bak.finappguaranteecardreceivables.dataaccess.CardReceivablesScheduleDataAccessImpl
