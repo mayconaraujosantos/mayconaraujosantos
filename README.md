@@ -1,4 +1,4 @@
-# Maycon Araujo - Senior Software Engineer
+ # Maycon Araujo - Senior Software Engineer
 
 ## 💼 Perfil Profissional
 
@@ -132,6 +132,8 @@ interface CardReceivablesScheduleDataAccess {
           taxIdentifier: String
   ): List<CardReceivablesSchedule>
 }
+```
+```kotlin
 package com.c6bak.finappguaranteecardreceivables.dataaccess
 
 import com.c6bak.finappguaranteecardreceivables.domain.dataaccess.CardReceivablesScheduleTableToDomainMapper
@@ -194,6 +196,8 @@ class CardReceivablesScheduleDataAccessImpl(
     repository.saveAll(entities)
   }
 }
+```
+```kotlin
 package com.c6bak.finappguaranteecardreceivables.resources.repositories
 
 import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
@@ -261,7 +265,75 @@ interface CardReceivablesScheduleRepository :
   ): CardReceivablesScheduleTable
 }
 
+```
+```kotlin 
+interface CardReceivablesScheduleDataAccess {
+  fun findSchedulesByTaxIdentifier(
+          taxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesSchedule>
+  fun findSchedulesByRootTaxIdentifier(
+          rootTaxIdentifier: String,
+          startDate: LocalDate,
+          endDate: LocalDate
+  ): List<CardReceivablesSchedule>
+  fun saveSchedules(schedules: List<CardReceivablesSchedule>)
+  fun findByCompositeKey(
+          register: String,
+          arrangement: String,
+          accreditor: String,
+          source: String,
+          taxIdentifier: String
+  ): List<CardReceivablesSchedule>
+}
+```
 
+```kotlin
+package com.c6bak.finappguaranteecardreceivables.domain.dataaccess.filters
+
+import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
+import java.time.LocalDate
+import org.springframework.data.jpa.domain.Specification
+
+object CardReceivablesScheduleFilters {
+  fun byTaxIdentifier(taxIdentifier: String) =
+          Specification<CardReceivablesScheduleTable> { root, _, cb ->
+            cb.equal(root.get<String>("taxIdentifier"), taxIdentifier)
+          }
+
+  fun byRootTaxIdentifier(rootTaxIdentifier: String) =
+          Specification<CardReceivablesScheduleTable> { root, _, cb ->
+            cb.like(root.get<String>("taxIdentifier"), "$rootTaxIdentifier%")
+          }
+
+  fun fromStartDate(date: LocalDate) =
+          Specification<CardReceivablesScheduleTable> { root, _, cb ->
+            cb.greaterThanOrEqualTo(root.get<LocalDate>("startDate"), date)
+          }
+
+  fun untilEndDate(date: LocalDate) =
+          Specification<CardReceivablesScheduleTable> { root, _, cb ->
+            cb.lessThanOrEqualTo(root.get<LocalDate>("endDate"), date)
+          }
+
+  fun byCompositeKey(
+          register: String,
+          arrangement: String,
+          accreditor: String,
+          source: String,
+          taxIdentifier: String
+  ) =
+          Specification<CardReceivablesScheduleTable> { root, _, cb ->
+            cb.and(
+                    cb.equal(root.get<String>("register"), register),
+                    cb.equal(root.get<String>("arrangement"), arrangement),
+                    cb.equal(root.get<String>("accreditor"), accreditor),
+                    cb.equal(root.get<String>("source"), source),
+                    cb.equal(root.get<String>("taxIdentifier"), taxIdentifier)
+            )
+          }
+}
 
 ```
 
