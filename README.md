@@ -170,6 +170,8 @@ object CardReceivablesScheduleTestUtils {
 package com.c6bak.finappguaranteecardreceivables.domain.dataaccess
 
 import com.c6bak.finappguaranteecardreceivables.domain.dataaccess.filters.CardReceivablesScheduleFilters
+import com.c6bak.finappguaranteecardreceivables.domain.entities.CardReceivableSchedulesItem
+import com.c6bak.finappguaranteecardreceivables.domain.entities.Money
 import com.c6bak.finappguaranteecardreceivables.resources.repositories.tables.CardReceivablesScheduleTable
 import io.mockk.mockk
 import io.mockk.verify
@@ -177,6 +179,7 @@ import jakarta.persistence.criteria.CriteriaBuilder
 import jakarta.persistence.criteria.CriteriaQuery
 import jakarta.persistence.criteria.Root
 import java.time.LocalDate
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import org.junit.jupiter.api.Test
 
@@ -303,12 +306,62 @@ class CardReceivablesScheduleFiltersTest {
     assertNotNull(startDateFilter)
     assertNotNull(endDateFilter)
   }
+
+  @Test
+  fun `should keep schedules mapping when filtering`() {
+    val schedules =
+            listOf(
+                    CardReceivableSchedulesItem(
+                            totalConstitute = Money(1000),
+                            available = Money(800),
+                            totalReceivableUnit = Money(1000),
+                            lockedValue = Money(200),
+                            preAnticipationConstitute = Money(0),
+                            settlementDate = LocalDate.of(2024, 7, 20)
+                    ),
+                    CardReceivableSchedulesItem(
+                            totalConstitute = Money(2000),
+                            available = Money(1500),
+                            totalReceivableUnit = Money(2000),
+                            lockedValue = Money(500),
+                            preAnticipationConstitute = Money(0),
+                            settlementDate = LocalDate.of(2024, 7, 21)
+                    )
+            )
+    val table =
+            CardReceivablesScheduleTable(
+                    id = "1",
+                    register = "CERC",
+                    arrangement = "ARR",
+                    accreditor = "ACC",
+                    source = "ONLINE",
+                    taxIdentifier = "12345678901234",
+                    startDate = LocalDate.of(2024, 7, 1),
+                    endDate = LocalDate.of(2024, 7, 31),
+                    schedules = schedules,
+                    createdAt = LocalDate.of(2024, 7, 1).atStartOfDay()
+            )
+    // Filtro simples para garantir que schedules não são afetados
+    val filter = CardReceivablesScheduleFilters.byTaxIdentifier("12345678901234")
+    val root = mockk<Root<CardReceivablesScheduleTable>>(relaxed = true)
+    val query = mockk<CriteriaQuery<*>>(relaxed = true)
+    val cb = mockk<CriteriaBuilder>(relaxed = true)
+    val predicate = filter.toPredicate(root, query, cb)
+    assertPredicateNotNull(predicate)
+    // Valida o mapeamento das agendas
+    assertNotNull(table.schedules)
+    assertEquals(2, table.schedules.size)
+    assertEquals(Money(1000), table.schedules[0].totalConstitute)
+    assertEquals(LocalDate.of(2024, 7, 21), table.schedules[1].settlementDate)
+  }
 }
 
 
 package com.c6bak.finappguaranteecardreceivables.domain.dataaccess
 
 import com.c6bak.finappguaranteecardreceivables.dataaccess.CardReceivablesScheduleDataAccessImpl
+import com.c6bak.finappguaranteecardreceivables.domain.entities.CardReceivableSchedulesItem
+import com.c6bak.finappguaranteecardreceivables.domain.entities.Money
 import com.c6bak.finappguaranteecardreceivables.domain.entities.enums.Register
 import com.c6bak.finappguaranteecardreceivables.domain.entities.enums.Source
 import com.c6bak.finappguaranteecardreceivables.resources.repositories.CardReceivablesScheduleRepository
@@ -324,6 +377,7 @@ import jakarta.persistence.criteria.Root
 import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -496,7 +550,57 @@ class CardReceivablesScheduleDataAccessImplTest {
     assertEquals(source, result[0].source)
     verify(exactly = 1) { repository.findAll(any<Specification<CardReceivablesScheduleTable>>()) }
   }
+
+  @Test
+  fun `should return schedules mapping correctly when finding by composite key`() {
+    val schedules =
+            listOf(
+                    CardReceivableSchedulesItem(
+                            totalConstitute = Money(1000),
+                            available = Money(800),
+                            totalReceivableUnit = Money(1000),
+                            lockedValue = Money(200),
+                            preAnticipationConstitute = Money(0),
+                            settlementDate = LocalDate.of(2024, 7, 20)
+                    ),
+                    CardReceivableSchedulesItem(
+                            totalConstitute = Money(2000),
+                            available = Money(1500),
+                            totalReceivableUnit = Money(2000),
+                            lockedValue = Money(500),
+                            preAnticipationConstitute = Money(0),
+                            settlementDate = LocalDate.of(2024, 7, 21)
+                    )
+            )
+    val matchingEntity =
+            CardReceivablesScheduleTestUtils.buildTable(
+                    id = "1",
+                    taxIdentifier = DEFAULT_TAX_IDENTIFIER,
+                    register = Register.CERC,
+                    arrangement = DEFAULT_ARRANGEMENT,
+                    accreditor = DEFAULT_ACCREDITOR,
+                    source = Source.ONLINE,
+                    schedules = schedules
+            )
+    every { repository.findAll(any<Specification<CardReceivablesScheduleTable>>()) } returns
+            listOf(matchingEntity)
+    val result =
+            dataAccess.findByCompositeKey(
+                    Register.CERC.value,
+                    DEFAULT_ARRANGEMENT,
+                    DEFAULT_ACCREDITOR,
+                    Source.ONLINE.value,
+                    DEFAULT_TAX_IDENTIFIER
+            )
+    assertEquals(1, result.size)
+    val returnedSchedules = result[0].schedules
+    assertNotNull(returnedSchedules)
+    assertEquals(2, returnedSchedules.size)
+    assertEquals(Money(1000), returnedSchedules[0].totalConstitute)
+    assertEquals(LocalDate.of(2024, 7, 21), returnedSchedules[1].settlementDate)
+  }
 }
+
 
 
 
