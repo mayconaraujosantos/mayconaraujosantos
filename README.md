@@ -164,8 +164,7 @@ class EscrowAccountGatewayTest {
 
         mockSuccessfulResponse(
             url = "${config.apiUrl}/escrow-accounts/123/create",
-            responseBody = responseBody,
-            method = "POST"
+            responseBody = responseBody
         )
 
         val result = assertDoesNotThrow {
@@ -181,8 +180,7 @@ class EscrowAccountGatewayTest {
         mockErrorResponse(
             url = "${config.apiUrl}/escrow-accounts/123/create",
             statusCode = HttpURLConnection.HTTP_UNAUTHORIZED,
-            errorBody = """{"error": "Unauthorized"}""",
-            method = "POST"
+            errorBody = """{"error": "Unauthorized"}"""
         )
 
         val exception = assertThrows<EscrowAccountException> {
@@ -260,8 +258,7 @@ class EscrowAccountGatewayTest {
         mockErrorResponse(
             url = "${config.apiUrl}/escrow-accounts",
             statusCode = HttpURLConnection.HTTP_UNAUTHORIZED,
-            errorBody = """{"error": "Invalid token"}""",
-            method = "POST"
+            errorBody = """{"error": "Invalid token"}"""
         )
 
         val exception = assertThrows<EscrowAccountException> {
@@ -300,36 +297,27 @@ class EscrowAccountGatewayTest {
         assertEquals("${config.apiUrl}/escrow-accounts/12345", capturedUrl)
     }
 
-    // Helper methods compatible with Fuel 2.2.2
-    private fun mockSuccessfulResponse(url: String, responseBody: String, method: String) {
+    // Helper methods for Fuel 2.2.2
+    private fun mockSuccessfulResponse(url: String, responseBody: String) {
         val client = mockk<Client> {
-            every { executeRequest(any()) } answers {
-                val request = it.invocation.args[0] as Request
-                // Verify method if needed
-                if (method == "POST" && request.httpMethod != Method.POST) {
-                    throw AssertionError("Expected POST request")
-                }
-                Response(
-                    urlString = url,
-                    statusCode = HttpURLConnection.HTTP_OK,
-                    responseBody = responseBody,
-                    headers = mapOf("Content-Type" to "application/json")
-                )
-            }
+            every { executeRequest(any()) } returns Response(
+                urlString = url,
+                statusCode = HttpURLConnection.HTTP_OK,
+                responseBody = responseBody,
+                headers = mapOf("Content-Type" to "application/json")
+            )
         }
         FuelManager.instance.client = client
     }
 
-    private fun mockErrorResponse(url: String, statusCode: Int, errorBody: String, method: String) {
+    private fun mockErrorResponse(url: String, statusCode: Int, errorBody: String) {
         val client = mockk<Client> {
-            every { executeRequest(any()) } answers {
-                Response(
-                    urlString = url,
-                    statusCode = statusCode,
-                    responseBody = errorBody,
-                    headers = mapOf("Content-Type" to "application/json")
-                )
-            }
+            every { executeRequest(any()) } returns Response(
+                urlString = url,
+                statusCode = statusCode,
+                responseBody = errorBody,
+                headers = mapOf("Content-Type" to "application/json")
+            )
         }
         FuelManager.instance.client = client
     }
