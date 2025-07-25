@@ -106,220 +106,223 @@ Minha experiência abrange a liderança técnica e a contribuição individual e
 Agradeço o seu interesse em meu perfil. Estou sempre aberto a novas oportunidades e desafios que me permitam aplicar e expandir minhas habilidades. 
 
 ```kotlin
-import com.banking.application.config.EscrowAccountConfig
-import com.banking.domain.entities.*
-import com.banking.resources.exceptions.EscrowAccountException
-import com.banking.resources.gateways.EscrowAccountGateway
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import com.github.kittinunf.fuel.core.*
-import com.github.kittinunf.fuel.httpPost
-import com.github.kittinunf.fuel.httpPut
-import com.github.kittinunf.fuel.httpDelete
-import com.github.kittinunf.result.Result
-import io.mockk.every
-import io.mockk.mockk
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertDoesNotThrow
-import org.junit.jupiter.api.assertThrows
-import java.net.HttpURLConnection
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+
+class EscrowAccountGatewayDAImplTest {
+  private lateinit var escrowAccountGateway: EscrowAccountGateway
+  private lateinit var escrowAccountGatewayDAImpl: EscrowAccountGatewayDAImpl
+
+  @BeforeEach
+  fun setup() {
+    escrowAccountGateway = mockk()
+    escrowAccountGatewayDAImpl = EscrowAccountGatewayDAImpl(escrowAccountGateway)
+  }
+
+  @Test
+  fun `should create new escrow account successfully`() {
+    // Given
+    val personId = "person-123"
+    val expectedResponse = EscrowAccountCreationDto().personId(personId).accountNumber("acc-456")
+    every { escrowAccountGateway.createNewEscrowAccount(personId) } returns expectedResponse
+
+    // When
+    val result = escrowAccountGatewayDAImpl.createNewEscrowAccount(personId)
+
+    // Then
+    assertEquals(expectedResponse, result)
+    verify { escrowAccountGateway.createNewEscrowAccount(personId) }
+  }
+
+  @Test
+  fun `should throw exception on create escrow account failure`() {
+    // Given
+    val personId = "person-123"
+    val expectedException = EscrowAccountException("Failed to create account", 400)
+    every { escrowAccountGateway.createNewEscrowAccount(personId) } throws expectedException
+
+    // When & Then
+    val exception =
+            assertThrows<EscrowAccountException> {
+              escrowAccountGatewayDAImpl.createNewEscrowAccount(personId)
+            }
+    assertEquals(expectedException.message, exception.message)
+    assertEquals(expectedException.statusCode, exception.statusCode)
+    verify { escrowAccountGateway.createNewEscrowAccount(personId) }
+  }
+
+  @Test
+  fun `should cancel escrow account successfully`() {
+    // Given
+    val cancelRequest =
+            EscrowAccountCancelDto()
+                    .accountId("acc-123")
+                    .blockingId(53)
+                    .blockingReason("Test reason")
+    val expectedResponse =
+            EscrowAccountCancelDto()
+                    .accountId("acc-123")
+                    .blockingId(53)
+                    .blockingReason("Test reason")
+    every { escrowAccountGateway.cancelEscrowAccount(cancelRequest) } returns expectedResponse
+
+    // When
+    val result = escrowAccountGatewayDAImpl.cancelEscrowAccount(cancelRequest)
+
+    // Then
+    assertEquals(expectedResponse, result)
+    verify { escrowAccountGateway.cancelEscrowAccount(cancelRequest) }
+  }
+
+  @Test
+  fun `should throw exception on cancel escrow account failure`() {
+    // Given
+    val cancelRequest =
+            EscrowAccountCancelDto()
+                    .accountId("acc-123")
+                    .blockingId(53)
+                    .blockingReason("Test reason")
+    val expectedException = EscrowAccountException("Failed to cancel account", 400)
+    every { escrowAccountGateway.cancelEscrowAccount(cancelRequest) } throws expectedException
+
+    // When & Then
+    val exception =
+            assertThrows<EscrowAccountException> {
+              escrowAccountGatewayDAImpl.cancelEscrowAccount(cancelRequest)
+            }
+    assertEquals(expectedException.message, exception.message)
+    assertEquals(expectedException.statusCode, exception.statusCode)
+    verify { escrowAccountGateway.cancelEscrowAccount(cancelRequest) }
+  }
+}
+
+```
+
+```kotlin 
 
 class EscrowAccountGatewayTest {
-    private val originalClient = FuelManager.instance.client
-    private val objectMapper: ObjectMapper = ObjectMapper().registerKotlinModule()
-    private val config = EscrowAccountConfig(
-        apiUrl = "https://escrow-api.com",
-        authToken = "test-token",
-        apiTimeout = 1000,
-        blockingId = 53,
-        blockingReason = "Test reason"
-    )
-    
-    private lateinit var escrowAccountGateway: EscrowAccountGateway
+  private val originalClient = FuelManager.instance.client
+  private val objectMapper: ObjectMapper = ObjectMapper()
+  private val escrowAccountConfig =
+          EscrowAccountConfig(
+                  apiUrl = "https://escrow-api.com",
+                  authToken = "test-token",
+                  apiTimeout = 1000,
+                  blockingId = 53,
+                  blockingReason = "Test reason"
+          )
 
-    @BeforeEach
-    fun setup() {
-        escrowAccountGateway = EscrowAccountGateway(objectMapper, config)
+  private lateinit var escrowAccountGateway: EscrowAccountGateway
+
+  @BeforeEach
+  fun setup() {
+    escrowAccountGateway = EscrowAccountGateway(escrowAccountConfig, objectMapper)
+  }
+
+  @AfterEach
+  fun tearDown() {
+    FuelManager.instance.client = originalClient
+  }
+
+  private fun mockErrorResponse(url: String, statusCode: Int, errorBody: String) {
+    val body =
+            mockk<Body> {
+              every { toByteArray() } returns errorBody.toByteArray()
+              every { toStream() } returns errorBody.toByteArray().inputStream()
+            }
+    val client =
+            mockk<com.github.kittinunf.fuel.core.Client> {
+              every { executeRequest(any()) } returns
+                      com.github.kittinunf.fuel.core.Response(
+                              url = URL(url),
+                              statusCode = statusCode,
+                              body = body,
+                              headers = loadHeaders()
+                      )
+            }
+    FuelManager.instance.client = client
+  }
+
+  private fun mockSuccessfulResponse(url: String, responseBody: String) {
+    val body =
+            mockk<Body> {
+              every { toByteArray() } returns responseBody.toByteArray()
+              every { toStream() } returns responseBody.toByteArray().inputStream()
+            }
+    val client =
+            mockk<com.github.kittinunf.fuel.core.Client> {
+              every { executeRequest(any()) } returns
+                      com.github.kittinunf.fuel.core.Response(
+                              url = URL(url),
+                              statusCode = HttpStatus.OK.value(),
+                              body = body,
+                              headers = loadHeaders()
+                      )
+            }
+    FuelManager.instance.client = client
+  }
+
+  private fun loadHeaders(): Headers {
+    return Headers().apply {
+      append("Content-Type", "application/json")
+      append("Authorization", escrowAccountConfig.authToken)
     }
+  }
 
-    @AfterEach
-    fun tearDown() {
-        FuelManager.instance.client = originalClient
-    }
-
-    @Test
-    fun `createNewEscrowAccount should return account when successful`() {
-        val responseBody = """
-        {
-            "accountId": "12345",
-            "status": "ACTIVE",
-            "createdAt": "2023-01-01T00:00:00Z"
-        }
+  @Test
+  fun `should create new escrow account successfully`() {
+    val responseBody =
+            """
+        { "account_number": "acc-1", "person_id": "person-1" }
         """.trimIndent()
-
-        mockSuccessfulResponse(
-            url = "${config.apiUrl}/escrow-accounts/123/create",
+    mockSuccessfulResponse(
+            url = "${escrowAccountConfig.apiUrl}/escrow-accounts/person-1/create",
             responseBody = responseBody
-        )
+    )
+    assertDoesNotThrow { escrowAccountGateway.createNewEscrowAccount("person-1") }
+  }
 
-        val result = assertDoesNotThrow {
-            escrowAccountGateway.createNewEscrowAccount("123")
-        }
+  @Test
+  fun `should throw exception on create escrow account failure`() {
+    val errorBody = """{"error": "Failed to create escrow account"}"""
+    mockErrorResponse(
+            url = "${escrowAccountConfig.apiUrl}/escrow-accounts/person-1/create",
+            statusCode = HttpStatus.BAD_REQUEST.value(),
+            errorBody = errorBody
+    )
+    assertThrows<EscrowAccountException> { escrowAccountGateway.createNewEscrowAccount("person-1") }
+  }
 
-        assertEquals("12345", result.accountId)
-        assertEquals("ACTIVE", result.status)
-    }
+  @Test
+  fun `should cancel escrow account successfully`() {
+    val responseBody =
+            """
+			{ "account_id": "acc-123", "blocking_id": 53, "blocking_reason": "Test reason" }
+			""".trimIndent()
+    mockSuccessfulResponse(
+            url = "${escrowAccountConfig.apiUrl}/escrow-accounts/cancel",
+            responseBody = responseBody
+    )
+    val cancelRequest =
+            EscrowAccountCancelDto()
+                    .accountId("acc-123")
+                    .blockingId(53)
+                    .blockingReason("Test reason")
+    assertDoesNotThrow { escrowAccountGateway.cancelEscrowAccount(cancelRequest) }
+  }
 
-    @Test
-    fun `createNewEscrowAccount should throw EscrowAccountException when 401 Unauthorized`() {
-        mockErrorResponse(
-            url = "${config.apiUrl}/escrow-accounts/123/create",
-            statusCode = HttpURLConnection.HTTP_UNAUTHORIZED,
-            errorBody = """{"error": "Unauthorized"}"""
-        )
-
-        val exception = assertThrows<EscrowAccountException> {
-            escrowAccountGateway.createNewEscrowAccount("123")
-        }
-
-        assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED, exception.statusCode)
-    }
-
-    @Test
-    fun `cancelEscrowAccount should include auth token in headers`() {
-        val responseBody = """{"accountId":"12345","status":"CANCELLED"}"""
-        var capturedHeaders: Map<String, String>? = null
-
-        val client = mockk<Client> {
-            every { executeRequest(any()) } answers {
-                val request = it.invocation.args[0] as Request
-                capturedHeaders = request.headers
-                Response(
-                    urlString = "${config.apiUrl}/escrow-accounts/cancel",
-                    statusCode = HttpURLConnection.HTTP_OK,
-                    responseBody = responseBody,
-                    headers = mapOf("Content-Type" to "application/json")
-                )
-            }
-        }
-
-        FuelManager.instance.client = client
-
-        val request = EscrowAccountCancel().apply {
-            accountId = "12345"
-        }
-
-        assertDoesNotThrow {
-            escrowAccountGateway.cancelEscrowAccount(request)
-        }
-
-        assertEquals(config.authToken, capturedHeaders?.get("Authorization"))
-    }
-
-    @Test
-    fun `cancelEscrowAccountAuto should include blocking details from config`() {
-        val responseBody = """{"accountId":"12345","status":"CANCELLED"}"""
-        var capturedBody: String? = null
-
-        val client = mockk<Client> {
-            every { executeRequest(any()) } answers {
-                val request = it.invocation.args[0] as Request
-                capturedBody = String(request.body.toByteArray())
-                Response(
-                    urlString = "${config.apiUrl}/escrow-accounts/cancel",
-                    statusCode = HttpURLConnection.HTTP_OK,
-                    responseBody = responseBody,
-                    headers = mapOf("Content-Type" to "application/json")
-                )
-            }
-        }
-
-        FuelManager.instance.client = client
-
-        escrowAccountGateway.cancelEscrowAccountAuto(
-            branch = "001",
-            accountNumber = "123456",
-            accountId = "12345",
-            contractNumber = "CNT123",
-            applyBlock = true
-        )
-
-        assertTrue(capturedBody!!.contains("\"blockingId\":53"))
-        assertTrue(capturedBody!!.contains("\"blockingReason\":\"Test reason\""))
-    }
-
-    @Test
-    fun `addEscrowAccountGuarantee should throw when 401 with invalid token`() {
-        mockErrorResponse(
-            url = "${config.apiUrl}/escrow-accounts",
-            statusCode = HttpURLConnection.HTTP_UNAUTHORIZED,
-            errorBody = """{"error": "Invalid token"}"""
-        )
-
-        val exception = assertThrows<EscrowAccountException> {
-            escrowAccountGateway.addEscrowAccountGuarantee(
-                EscrowAccountCreation(accountId = "123", guaranteeAmount = 100.0)
-            )
-        }
-
-        assertEquals(HttpURLConnection.HTTP_UNAUTHORIZED, exception.statusCode)
-    }
-
-    @Test
-    fun `disableEscrowAccount should make DELETE request with correct URL`() {
-        val responseBody = """{"accountId":"12345","status":"DISABLED"}"""
-        var capturedUrl: String? = null
-
-        val client = mockk<Client> {
-            every { executeRequest(any()) } answers {
-                val request = it.invocation.args[0] as Request
-                capturedUrl = request.url.toString()
-                Response(
-                    urlString = "${config.apiUrl}/escrow-accounts/12345",
-                    statusCode = HttpURLConnection.HTTP_OK,
-                    responseBody = responseBody,
-                    headers = mapOf("Content-Type" to "application/json")
-                )
-            }
-        }
-
-        FuelManager.instance.client = client
-
-        assertDoesNotThrow {
-            escrowAccountGateway.disableEscrowAccount(12345)
-        }
-
-        assertEquals("${config.apiUrl}/escrow-accounts/12345", capturedUrl)
-    }
-
-    // Helper methods for Fuel 2.2.2
-    private fun mockSuccessfulResponse(url: String, responseBody: String) {
-        val client = mockk<Client> {
-            every { executeRequest(any()) } returns Response(
-                urlString = url,
-                statusCode = HttpURLConnection.HTTP_OK,
-                responseBody = responseBody,
-                headers = mapOf("Content-Type" to "application/json")
-            )
-        }
-        FuelManager.instance.client = client
-    }
-
-    private fun mockErrorResponse(url: String, statusCode: Int, errorBody: String) {
-        val client = mockk<Client> {
-            every { executeRequest(any()) } returns Response(
-                urlString = url,
-                statusCode = statusCode,
-                responseBody = errorBody,
-                headers = mapOf("Content-Type" to "application/json")
-            )
-        }
-        FuelManager.instance.client = client
-    }
+  @Test
+  fun `should throw exception on cancel escrow account failure`() {
+    val errorBody = """{"error": "Failed to cancel escrow account"}"""
+    mockErrorResponse(
+            url = "${escrowAccountConfig.apiUrl}/escrow-accounts/cancel",
+            statusCode = HttpStatus.BAD_REQUEST.value(),
+            errorBody = errorBody
+    )
+    val cancelRequest =
+            EscrowAccountCancelDto()
+                    .accountId("acc-123")
+                    .blockingId(53)
+                    .blockingReason("Test reason")
+    assertThrows<EscrowAccountException> { escrowAccountGateway.cancelEscrowAccount(cancelRequest) }
+  }
 }
 ```
