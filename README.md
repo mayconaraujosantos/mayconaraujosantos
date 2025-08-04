@@ -329,7 +329,18 @@ class CardReceivablesLockDataAccessImplTest {
     verify(exactly = 1) { repository.findByContractNumber(contractNumber) }
   }
 }
+
+interface CardReceivablesLockDataAccess {
+  fun create(lock: CardReceivablesLock): CardReceivablesLock
+  fun update(lock: CardReceivablesLock): CardReceivablesLock
+  fun getById(id: Long): CardReceivablesLock?
+  fun findByContractNumber(contractNumber: String): CardReceivablesLock?
+  fun incrementCreationRetryAttempts(id: Long): CardReceivablesLock?
+  fun incrementProactiveSearchAttempts(id: Long): CardReceivablesLock?
+}
+
 ```
+
 ```kotlin
 @Service
 class CardReceivablesLockDataAccessImpl(
